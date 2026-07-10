@@ -1,0 +1,162 @@
+# For detailed configuration reference documentation, visit:
+# https://supabase.com/docs/guides/local-development/cli/config
+project_id = "iel-calendario"
+
+[api]
+enabled = true
+port = 54321
+schemas = ["public", "graphql_public"]
+extra_search_path = ["public", "extensions"]
+max_rows = 1000
+
+[api.tls]
+enabled = false
+
+[db]
+port = 54322
+shadow_port = 54320
+major_version = 15
+
+[db.pooler]
+enabled = false
+port = 54329
+pool_mode = "transaction"
+default_pool_size = 20
+max_client_conn = 100
+
+[db.seed]
+# Seeds the database after migrations during a db reset.
+enabled = true
+sql_paths = ['./seed.sql']
+
+[realtime]
+enabled = true
+
+[studio]
+enabled = true
+port = 54323
+api_url = "http://127.0.0.1"
+openai_api_key = "env(OPENAI_API_KEY)"
+
+[inbucket]
+enabled = true
+port = 54324
+
+[storage]
+enabled = true
+file_size_limit = "50MiB"
+
+[storage.image_transformation]
+enabled = true
+
+[auth]
+# Supabase Auth is not used for domain data — access is via custom tokens in the
+# Edge Functions. These values only affect the local dev auth server.
+enabled = true
+site_url = "http://127.0.0.1:5173"
+additional_redirect_urls = ["http://127.0.0.1:5173"]
+jwt_expiry = 3600
+enable_refresh_token_rotation = true
+refresh_token_reuse_interval = 10
+enable_signup = true
+enable_anonymous_sign_ins = false
+enable_manual_linking = false
+minimum_password_length = 6
+password_requirements = ""
+
+[auth.email]
+enable_signup = true
+double_confirm_changes = true
+enable_confirmations = false
+secure_password_change = false
+max_frequency = "1s"
+otp_length = 6
+otp_expiry = 3600
+
+[auth.sms]
+enable_signup = false
+enable_confirmations = false
+template = "Your code is {{ .Code }}"
+max_frequency = "5s"
+
+[auth.sms.twilio]
+enabled = false
+account_sid = ""
+message_service_sid = ""
+auth_token = "env(SUPABASE_AUTH_SMS_TWILIO_AUTH_TOKEN)"
+
+[auth.mfa]
+max_enrolled_factors = 10
+
+[auth.mfa.totp]
+enroll_enabled = true
+verify_enabled = true
+
+[auth.mfa.phone]
+enroll_enabled = false
+verify_enabled = false
+otp_length = 6
+template = "Your code is {{ .Code }}"
+max_frequency = "5s"
+
+[edge_runtime]
+enabled = true
+# Use `oneshot` for hot reload, or `per_worker` for load testing.
+policy = "oneshot"
+inspector_port = 8083
+
+# Edge Functions. All functions authenticate via the custom x-access-token header
+# and the service_role inside the function, so Supabase JWT verification is off
+# (PROMPT.md section 2: verify_jwt = false).
+[functions.health]
+enabled = true
+verify_jwt = false
+
+[functions.auth]
+enabled = true
+verify_jwt = false
+
+[functions.ministries]
+enabled = true
+verify_jwt = false
+
+[functions.people]
+enabled = true
+verify_jwt = false
+
+[functions.ministry-members]
+enabled = true
+verify_jwt = false
+
+[functions.events]
+enabled = true
+verify_jwt = false
+
+[functions.services]
+enabled = true
+verify_jwt = false
+
+[functions.tokens]
+enabled = true
+verify_jwt = false
+
+[functions.audit]
+enabled = true
+verify_jwt = false
+
+[functions.unavailabilities]
+enabled = true
+verify_jwt = false
+
+[functions.ebd-classes]
+enabled = true
+verify_jwt = false
+
+[functions.ics]
+enabled = true
+verify_jwt = false
+
+[analytics]
+enabled = true
+port = 54327
+backend = "postgres"

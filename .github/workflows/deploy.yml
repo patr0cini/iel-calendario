@@ -1,0 +1,60 @@
+name: deploy
+
+# Builds the frontend and publishes it to GitHub Pages.
+#
+# Required repository configuration (Settings):
+#   - Pages: Source = "GitHub Actions"
+#   - Variable SUPABASE_FUNCTIONS_URL, e.g. https://<ref>.supabase.co/functions/v1
+#
+# The base path is derived from the repository name (project pages live under
+# /<repo>/). For a user/organization page (<user>.github.io) set base to "/".
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - name: Build
+        run: npm run build
+        env:
+          VITE_BASE_PATH: /${{ github.event.repository.name }}/
+          VITE_FUNCTIONS_URL: ${{ vars.SUPABASE_FUNCTIONS_URL }}
+      - name: SPA fallback for deep links (/culto/..., /escalas, /admin)
+        run: cp dist/index.html dist/404.html
+      - name: Fail if a secret leaked into the bundle
+        run: |
+          if grep -rIlE 'service_role|SUPABASE_SERVICE_ROLE|BEGIN (RSA |EC |)PRIVATE KEY' dist/; then
+            echo "::error::Secret-like string found in dist/"; exit 1
+          fi
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: dist
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

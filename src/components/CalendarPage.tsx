@@ -1,0 +1,299 @@
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Link, useNavigate } from "react-router-dom";
+import FullCalendar from "@fullcalendar/react";
+import type {
+  DateSelectArg,
+  EventClickArg,
+  EventDropArg,
+  DatesSetArg,
+  EventInput as FcEventInput,
+} from "@fullcalendar/core";
+import type { EventResizeDoneArg } from "@fullcalendar/interaction";
+import dayGridPlugin from "@fullcalendar/daygrid";
+import timeGridPlugin from "@fullcalendar/timegrid";
+import multiMonthPlugin from "@fullcalendar/multimonth";
+import interactionPlugin from "@fullcalendar/interaction";
+import luxonPlugin from "@fullcalendar/luxon3";
+import ptLocale from "@fullcalendar/core/locales/pt";
+
+import { useSession } from "../session/SessionProvider";
+import { useEventsQuery, useEventMutations, type Range } from "../hooks/useEvents";
+import { TIME_ZONE } from "../lib/datetime";
+import type { EventInput, EventRow, Ministry } from "../lib/types";
+import { MinistryFilter } from "./MinistryFilter";
+import { EventModal } from "./EventModal";
+
+const FILTER_KEY = "iel.calendar.filter";
+
+type ModalState =
+  | { mode: "create"; defaultStart: string; defaultEnd: string }
+  | { mode: "edit" | "view"; event: EventRow }
+  | null;
+
+function errorMessage(e: unknown): string {
+  return e instanceof Error ? e.message : "Ocorreu um erro.";
+}
+
+export function CalendarPage() {
+  const session = useSession();
+  const navigate = useNavigate();
+  const calendarRef = useRef<FullCalendar>(null);
+
+  // Sunday cells get a marker that opens the order of service (PROMPT §10).
+  const decorateSunday = useCallback(
+    (arg: { date: Date; el: HTMLElement }) => {
+      if (arg.date.getUTCDay() !== 0) return;
+      const dateStr = arg.date.toISOString().slice(0, 10);
+      const top = arg.el.querySelector(".fc-daygrid-day-top");
+      if (!top || top.querySelector(".fc-culto-link")) return;
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.textContent = "⛪";
+      btn.title = "Ordem do culto";
+      btn.className = "fc-culto-link";
+      btn.style.cssText = "margin-right:auto;background:none;border:none;cursor:pointer;font-size:0.85em;opacity:0.6;";
+      btn.addEventListener("click", (e) => {
+        e.stopPropagation();
+        navigate(`/culto/${dateStr}`);
+      });
+      top.insertBefore(btn, top.firstChild);
+    },
+    [navigate],
+  );
+
+  const [range, setRange] = useState<Range | null>(null);
+  const [modal, setModal] = useState<ModalState>(null);
+  const [pageError, setPageError] = useState<string | null>(null);
+
+  const [selected, setSelected] = useState<Set<string>>(() => {
+    const stored = readStoredFilter();
+    return stored ?? new Set(session.ministries.map((m) => m.id));
+  });
+  useEffect(() => {
+    localStorage.setItem(FILTER_KEY, JSON.stringify([...selected]));
+  }, [selected]);
+
+  const eventsQuery = useEventsQuery(range);
+  const { createEvent, updateEvent, deleteEvent } = useEventMutations();
+  const saving = createEvent.isPending || updateEvent.isPending || deleteEvent.isPending;
+
+  const fcEvents: FcEventInput[] = useMemo(() => {
+    const rows = eventsQuery.data ?? [];
+    return rows
+      .filter((e) => selected.has(e.ministry_id))
+      .map((e) => {
+        const color = session.ministryById.get(e.ministry_id)?.color ?? "#64748b";
+        return {
+          id: e.id,
+          title: e.title,
+          start: e.starts_at,
+          end: e.ends_at,
+          allDay: e.all_day,
+          backgroundColor: color,
+          borderColor: color,
+          editable: session.canEditEvent(e),
+          classNames: e.status === "cancelada" ? ["opacity-50", "line-through"] : [],
+          extendedProps: { row: e },
+        };
+      });
+  }, [eventsQuery.data, selected, session]);
+
+  const handleDatesSet = useCallback((arg: DatesSetArg) => {
+    setRange({ from: arg.start.toISOString(), to: arg.end.toISOString() });
+  }, []);
+
+  const handleSelect = useCallback(
+    (arg: DateSelectArg) => {
+      if (!session.canCreate) return;
+      setModal({ mode: "create", defaultStart: arg.start.toISOString(), defaultEnd: arg.end.toISOString() });
+      calendarRef.current?.getApi().unselect();
+    },
+    [session.canCreate],
+  );
+
+  const handleEventClick = useCallback(
+    (arg: EventClickArg) => {
+      const row = arg.event.extendedProps.row as EventRow;
+      setModal({ mode: session.canEditEvent(row) ? "edit" : "view", event: row });
+    },
+    [session],
+  );
+
+  // Drag/resize: FullCalendar moves the event immediately; on failure we revert.
+  const handleMove = useCallback(
+    async (arg: EventDropArg | EventResizeDoneArg) => {
+      const row = arg.event.extendedProps.row as EventRow;
+      const patch: Partial<EventInput> = {
+        starts_at: arg.event.start!.toISOString(),
+        all_day: arg.event.allDay,
+      };
+      if (arg.event.end) patch.ends_at = arg.event.end.toISOString();
+      try {
+        await updateEvent.mutateAsync({ id: row.id, patch });
+      } catch (e) {
+        arg.revert();
+        setPageError(errorMessage(e));
+      }
+    },
+    [updateEvent],
+  );
+
+  async function handleSave(input: EventInput) {
+    try {
+      if (modal?.mode === "create") await createEvent.mutateAsync(input);
+      else if (modal?.mode === "edit") await updateEvent.mutateAsync({ id: modal.event.id, patch: input });
+      setModal(null);
+    } catch (e) {
+      setPageError(errorMessage(e));
+    }
+  }
+
+  async function handleDelete() {
+    if (modal?.mode !== "edit") return;
+    try {
+      await deleteEvent.mutateAsync(modal.event.id);
+      setModal(null);
+    } catch (e) {
+      setPageError(errorMessage(e));
+    }
+  }
+
+  // Keyboard shortcuts A M S D (PROMPT §10).
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (modal) return;
+      const el = e.target as HTMLElement;
+      if (["INPUT", "SELECT", "TEXTAREA"].includes(el.tagName)) return;
+      const api = calendarRef.current?.getApi();
+      if (!api) return;
+      const map: Record<string, string> = { a: "multiMonthYear", m: "dayGridMonth", s: "timeGridWeek", d: "timeGridDay" };
+      const view = map[e.key.toLowerCase()];
+      if (view) {
+        api.changeView(view);
+        e.preventDefault();
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [modal]);
+
+  const modalMinistries: Ministry[] =
+    modal?.mode === "view" || session.scope === "admin"
+      ? session.ministries
+      : session.ministries.filter((m) => m.id === session.ownMinistryId);
+  const defaultMinistryId = session.ownMinistryId ?? session.ministries[0]?.id ?? "";
+
+  return (
+    <div className="mx-auto max-w-6xl px-3 py-4 sm:px-6">
+      <Header session={session} />
+
+      {pageError && (
+        <div className="mb-3 flex items-center justify-between rounded-lg border border-red-300 bg-red-50 px-3 py-2 text-sm text-red-700 dark:border-red-800 dark:bg-red-950/40 dark:text-red-300">
+          <span>{pageError}</span>
+          <button type="button" onClick={() => setPageError(null)} aria-label="Fechar">✕</button>
+        </div>
+      )}
+
+      <div className="flex flex-col gap-4 sm:flex-row">
+        <MinistryFilter
+          ministries={session.ministries}
+          selected={selected}
+          onToggle={(id) =>
+            setSelected((prev) => {
+              const next = new Set(prev);
+              next.has(id) ? next.delete(id) : next.add(id);
+              return next;
+            })
+          }
+          onAll={() => setSelected(new Set(session.ministries.map((m) => m.id)))}
+          onNone={() => setSelected(new Set())}
+        />
+
+        <div className="min-w-0 flex-1">
+          {eventsQuery.isError && (
+            <p className="mb-2 text-sm text-red-600">Não foi possível carregar os eventos.</p>
+          )}
+          <FullCalendar
+            ref={calendarRef}
+            plugins={[dayGridPlugin, timeGridPlugin, multiMonthPlugin, interactionPlugin, luxonPlugin]}
+            timeZone={TIME_ZONE}
+            locale={ptLocale}
+            firstDay={1}
+            initialView="dayGridMonth"
+            headerToolbar={{
+              left: "prev,next today",
+              center: "title",
+              right: "multiMonthYear,dayGridMonth,timeGridWeek,timeGridDay",
+            }}
+            buttonText={{ today: "Hoje" }}
+            views={{
+              multiMonthYear: { buttonText: "Ano" },
+              dayGridMonth: { buttonText: "Mês" },
+              timeGridWeek: { buttonText: "Semana" },
+              timeGridDay: { buttonText: "Dia" },
+            }}
+            height="auto"
+            nowIndicator
+            selectable={session.canCreate}
+            selectMirror
+            editable
+            events={fcEvents}
+            datesSet={handleDatesSet}
+            select={handleSelect}
+            eventClick={handleEventClick}
+            eventDrop={handleMove}
+            eventResize={handleMove}
+            dayCellDidMount={decorateSunday}
+          />
+        </div>
+      </div>
+
+      {modal && (
+        <EventModal
+          mode={modal.mode}
+          ministries={modalMinistries}
+          defaultMinistryId={defaultMinistryId}
+          event={modal.mode === "create" ? undefined : modal.event}
+          defaultStart={modal.mode === "create" ? modal.defaultStart : undefined}
+          defaultEnd={modal.mode === "create" ? modal.defaultEnd : undefined}
+          saving={saving}
+          onClose={() => setModal(null)}
+          onSave={handleSave}
+          onDelete={modal.mode === "edit" ? handleDelete : undefined}
+        />
+      )}
+    </div>
+  );
+}
+
+function Header({ session }: { session: ReturnType<typeof useSession> }) {
+  const scopeLabel =
+    session.scope === "admin" ? "Presbitério" : session.scope === "ministry" ? "Ministério" : "Leitura";
+  const own = session.ownMinistryId ? session.ministryById.get(session.ownMinistryId) : null;
+  return (
+    <header className="mb-4 flex flex-wrap items-center justify-between gap-2">
+      <div>
+        <h1 className="text-xl font-bold tracking-tight sm:text-2xl">Calendário — IEL</h1>
+        {own && <p className="text-sm text-black/60 dark:text-white/60">{own.name}</p>}
+      </div>
+      <div className="flex items-center gap-3">
+        <Link to="/escalas" className="text-sm font-medium text-blue-600 hover:underline">Escalas</Link>
+        {session.scope === "admin" && (
+          <Link to="/admin" className="text-sm font-medium text-blue-600 hover:underline">Administração</Link>
+        )}
+        <span className="rounded-full bg-black/5 px-3 py-1 text-xs font-medium dark:bg-white/10">{scopeLabel}</span>
+      </div>
+    </header>
+  );
+}
+
+function readStoredFilter(): Set<string> | null {
+  try {
+    const raw = localStorage.getItem(FILTER_KEY);
+    if (!raw) return null;
+    const arr = JSON.parse(raw) as unknown;
+    return Array.isArray(arr) ? new Set(arr.filter((x): x is string => typeof x === "string")) : null;
+  } catch {
+    return null;
+  }
+}
