@@ -20,4 +20,4 @@ jobs:
       - name: Ping /health
         run: |
           curl --fail --silent --show-error --max-time 60 \
-            "${{ secrets.SUPABASE_FUNCTIONS_URL }}/health"
+            "${{ vars.SUPABASE_FUNCTIONS_URL }}/health"
