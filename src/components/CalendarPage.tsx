@@ -18,10 +18,24 @@ import ptLocale from "@fullcalendar/core/locales/pt";
 
 import { useSession } from "../session/SessionProvider";
 import { useEventsQuery, useEventMutations, type Range } from "../hooks/useEvents";
+import { useServicesQuery } from "../hooks/useServices";
 import { TIME_ZONE } from "../lib/datetime";
 import type { EventInput, EventRow, Ministry } from "../lib/types";
 import { MinistryFilter } from "./MinistryFilter";
 import { EventModal } from "./EventModal";
+
+// Sunday service defaults: starts at services.service_time (10:30), shown as a
+// 2-hour block (10:30–12:30). Clicking it opens the order of service.
+const SERVICE_DURATION_MINUTES = 120;
+const SERVICE_COLOR = "#a16207"; // deep gold — distinct from ministry colors
+
+function serviceEndTime(startTime: string): string {
+  const [h, m] = startTime.split(":").map(Number);
+  const total = h * 60 + m + SERVICE_DURATION_MINUTES;
+  const eh = Math.floor(total / 60) % 24;
+  const em = total % 60;
+  return `${String(eh).padStart(2, "0")}:${String(em).padStart(2, "0")}`;
+}
 
 const FILTER_KEY = "iel.calendar.filter";
 
@@ -39,28 +53,6 @@ export function CalendarPage() {
   const navigate = useNavigate();
   const calendarRef = useRef<FullCalendar>(null);
 
-  // Sunday cells get a marker that opens the order of service (PROMPT §10).
-  const decorateSunday = useCallback(
-    (arg: { date: Date; el: HTMLElement }) => {
-      if (arg.date.getUTCDay() !== 0) return;
-      const dateStr = arg.date.toISOString().slice(0, 10);
-      const top = arg.el.querySelector(".fc-daygrid-day-top");
-      if (!top || top.querySelector(".fc-culto-link")) return;
-      const btn = document.createElement("button");
-      btn.type = "button";
-      btn.textContent = "⛪";
-      btn.title = "Ordem do culto";
-      btn.className = "fc-culto-link";
-      btn.style.cssText = "margin-right:auto;background:none;border:none;cursor:pointer;font-size:0.85em;opacity:0.6;";
-      btn.addEventListener("click", (e) => {
-        e.stopPropagation();
-        navigate(`/culto/${dateStr}`);
-      });
-      top.insertBefore(btn, top.firstChild);
-    },
-    [navigate],
-  );
-
   const [range, setRange] = useState<Range | null>(null);
   const [modal, setModal] = useState<ModalState>(null);
   const [pageError, setPageError] = useState<string | null>(null);
@@ -74,12 +66,13 @@ export function CalendarPage() {
   }, [selected]);
 
   const eventsQuery = useEventsQuery(range);
+  const servicesQuery = useServicesQuery(range);
   const { createEvent, updateEvent, deleteEvent } = useEventMutations();
   const saving = createEvent.isPending || updateEvent.isPending || deleteEvent.isPending;
 
   const fcEvents: FcEventInput[] = useMemo(() => {
     const rows = eventsQuery.data ?? [];
-    return rows
+    const ministryEvents: FcEventInput[] = rows
       .filter((e) => selected.has(e.ministry_id))
       .map((e) => {
         const color = session.ministryById.get(e.ministry_id)?.color ?? "#64748b";
@@ -96,7 +89,26 @@ export function CalendarPage() {
           extendedProps: { row: e },
         };
       });
-  }, [eventsQuery.data, selected, session]);
+
+    // Sunday services are always shown — the culto belongs to the whole church.
+    // Naive datetimes (no offset) are interpreted in the calendar's timezone.
+    const serviceEvents: FcEventInput[] = (servicesQuery.data ?? []).map((s) => {
+      const startTime = s.service_time.slice(0, 5);
+      return {
+        id: `svc-${s.id}`,
+        title: s.theme ? `Culto — ${s.theme}` : (s.label?.trim() || "Culto"),
+        start: `${s.service_date}T${startTime}:00`,
+        end: `${s.service_date}T${serviceEndTime(startTime)}:00`,
+        backgroundColor: SERVICE_COLOR,
+        borderColor: SERVICE_COLOR,
+        editable: false,
+        classNames: ["cursor-pointer"],
+        extendedProps: { serviceDate: s.service_date },
+      };
+    });
+
+    return [...ministryEvents, ...serviceEvents];
+  }, [eventsQuery.data, servicesQuery.data, selected, session]);
 
   const handleDatesSet = useCallback((arg: DatesSetArg) => {
     setRange({ from: arg.start.toISOString(), to: arg.end.toISOString() });
@@ -113,10 +125,16 @@ export function CalendarPage() {
 
   const handleEventClick = useCallback(
     (arg: EventClickArg) => {
+      // Sunday services open the order of service, not the event modal.
+      const serviceDate = arg.event.extendedProps.serviceDate as string | undefined;
+      if (serviceDate) {
+        navigate(`/culto/${serviceDate}`);
+        return;
+      }
       const row = arg.event.extendedProps.row as EventRow;
       setModal({ mode: session.canEditEvent(row) ? "edit" : "view", event: row });
     },
-    [session],
+    [session, navigate],
   );
 
   // Drag/resize: FullCalendar moves the event immediately; on failure we revert.
@@ -243,7 +261,6 @@ export function CalendarPage() {
             eventClick={handleEventClick}
             eventDrop={handleMove}
             eventResize={handleMove}
-            dayCellDidMount={decorateSunday}
           />
         </div>
       </div>

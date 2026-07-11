@@ -162,7 +162,7 @@ Deno.serve(async (req) => {
     // Sunday services: part of every feed — the culto belongs to everyone.
     for (const s of services.data ?? []) {
       const start = lisbonToUtc(s.service_date, s.service_time);
-      const end = new Date(start.getTime() + 90 * 60_000); // typical 1h30
+      const end = new Date(start.getTime() + 120 * 60_000); // culto 10:30–12:30
       const title = s.label?.trim() || "Culto";
       const detail = [s.theme && `Tema: ${s.theme}`, s.scripture && `Texto: ${s.scripture}`]
         .filter(Boolean)
