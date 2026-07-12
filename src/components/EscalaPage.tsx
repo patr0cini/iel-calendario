@@ -113,35 +113,71 @@ export function EscalaPage() {
                       <Link to={`/culto/${s.service_date}`} className="text-blue-600 hover:underline">{shortDate(s.service_date)}</Link>
                     </td>
                     {roles.map((r) => {
-                      const assignment = mine.find((a) => a.role === r.name);
-                      const current = assignment?.person_id ?? "";
-                      const isUnavail = current !== "" && unavailable.has(current);
+                      // A role may hold several people (e.g. several "Voz").
+                      const assigned = mine.filter((a) => a.role === r.name && a.person_id);
+
+                      // Rebuilds the whole ministry roster for this service after
+                      // changing one slot of one role, then saves immediately.
+                      const applyChange = (slotIndex: number, newValue: string) => {
+                        if (!detail) return;
+                        const byRole = new Map<string, (string | null)[]>(
+                          roles.map((rr) => [
+                            rr.name,
+                            mine.filter((a) => a.role === rr.name && a.person_id).map((a) => a.person_id),
+                          ]),
+                        );
+                        const list = [...(byRole.get(r.name) ?? [])];
+                        if (slotIndex === -1) list.push(newValue);
+                        else if (newValue === "") list.splice(slotIndex, 1);
+                        else list[slotIndex] = newValue;
+                        byRole.set(r.name, [...new Set(list)]);
+                        const assignments = roles.flatMap((rr, ri) =>
+                          (byRole.get(rr.name) ?? []).map((pid, i) => ({
+                            person_id: pid,
+                            role: rr.name,
+                            sort_order: ri * 10 + i,
+                          })),
+                        );
+                        saveCell.mutate({ serviceId: detail.service.id, date: s.service_date, assignments });
+                      };
+
+                      const cellSelect = (value: string, slotIndex: number, isUnavail: boolean) => (
+                        <select
+                          key={slotIndex}
+                          value={value}
+                          className={"w-full rounded border px-1 py-1 text-sm dark:bg-neutral-800 " + (isUnavail ? "border-amber-500" : "border-black/10 dark:border-white/10")}
+                          onChange={(e) => applyChange(slotIndex, e.target.value)}
+                        >
+                          <option value="">{slotIndex === -1 ? "+" : "— remover —"}</option>
+                          {peopleList.map((p) => (
+                            <option key={p.id} value={p.id}>{p.full_name}</option>
+                          ))}
+                        </select>
+                      );
+
                       return (
-                        <td key={r.id} className="p-1">
+                        <td key={r.id} className="p-1 align-top">
                           {editable && detail ? (
-                            <select
-                              value={current ?? ""}
-                              className={"w-full rounded border px-1 py-1 text-sm dark:bg-neutral-800 " + (isUnavail ? "border-amber-500" : "border-black/10 dark:border-white/10")}
-                              onChange={(e) => {
-                                const map = new Map(mine.map((a) => [a.role, a.person_id]));
-                                map.set(r.name, e.target.value || null);
-                                const assignments = roles.map((rr, idx) => ({
-                                  person_id: map.get(rr.name) ?? null,
-                                  role: rr.name,
-                                  sort_order: idx,
-                                }));
-                                saveCell.mutate({ serviceId: detail.service.id, date: s.service_date, assignments });
-                              }}
-                            >
-                              <option value="">—</option>
-                              {peopleList.map((p) => (
-                                <option key={p.id} value={p.id}>{p.full_name}</option>
-                              ))}
-                            </select>
+                            <div className="flex flex-col gap-1">
+                              {assigned.map((a, i) => cellSelect(a.person_id as string, i, unavailable.has(a.person_id as string)))}
+                              {cellSelect("", -1, false)}
+                            </div>
                           ) : (
-                            <span className={isUnavail ? "text-amber-600" : ""}>
-                              {current ? assignment?.person_name ?? "•" : <span className="text-black/25">—</span>}
-                              {isUnavail && " ⚠️"}
+                            <span>
+                              {assigned.length === 0 ? (
+                                <span className="text-black/25">—</span>
+                              ) : (
+                                assigned.map((a, i) => {
+                                  const isUnavail = unavailable.has(a.person_id as string);
+                                  return (
+                                    <span key={a.id} className={isUnavail ? "text-amber-600" : ""}>
+                                      {i > 0 && <span className="text-black/40">, </span>}
+                                      {a.person_name ?? "•"}
+                                      {isUnavail && " ⚠️"}
+                                    </span>
+                                  );
+                                })
+                              )}
                             </span>
                           )}
                         </td>

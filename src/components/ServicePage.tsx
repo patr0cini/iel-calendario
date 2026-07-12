@@ -78,10 +78,13 @@ function ServiceView({
   const rolesFor = (m: Ministry): RosterRow[] =>
     detail.ministry_roles
       .filter((r) => r.ministry_id === m.id)
-      .map((r) => {
-        const a = detail.assignments.find((x) => x.ministry_id === m.id && x.role === r.name);
-        return { key: r.name, label: r.name, personId: a?.person_id ?? null, personName: a?.person_name ?? null };
-      });
+      .map((r) => ({
+        key: r.name,
+        label: r.name,
+        people: detail.assignments
+          .filter((x) => x.ministry_id === m.id && x.role === r.name && x.person_id)
+          .map((x) => ({ id: x.person_id as string, name: x.person_name })),
+      }));
 
   const conflicts = useMemo(() => computeConflicts(detail), [detail]);
 
@@ -154,9 +157,16 @@ function ServiceView({
             saving={savingKey === m.slug && saveAssignments.isPending}
             onSave={(rows) => {
               setSavingKey(m.slug);
+              // One row per person; a role with several people yields several rows.
               saveAssignments.mutate({
                 ministry: m.slug,
-                assignments: rows.map((r, i) => ({ person_id: r.personId, role: r.key, sort_order: i })),
+                assignments: rows.flatMap((r, ri) =>
+                  r.personIds.map((personId, i) => ({
+                    person_id: personId,
+                    role: r.key,
+                    sort_order: ri * 10 + i,
+                  })),
+                ),
               });
             }}
           />
@@ -167,10 +177,13 @@ function ServiceView({
           <RosterEditor
             title="Escola Bíblica Dominical"
             color={ebdMinistry.color}
-            rows={detail.ebd_classes.map((c) => {
-              const a = detail.ebd_assignments.find((x) => x.ebd_class_id === c.id);
-              return { key: c.id, label: c.name, personId: a?.person_id ?? null, personName: a?.person_name ?? null };
-            })}
+            rows={detail.ebd_classes.map((c) => ({
+              key: c.id,
+              label: c.name,
+              people: detail.ebd_assignments
+                .filter((x) => x.ebd_class_id === c.id && x.person_id)
+                .map((x) => ({ id: x.person_id as string, name: x.person_name })),
+            }))}
             people={peopleData}
             editable={canEditEbd}
             unavailableIds={unavailable}
@@ -181,7 +194,11 @@ function ServiceView({
               for (const r of rows) {
                 saveEbd.mutate({
                   classId: r.key,
-                  assignments: r.personId ? [{ person_id: r.personId, role: "Professor", sort_order: 0 }] : [],
+                  assignments: r.personIds.map((personId, i) => ({
+                    person_id: personId,
+                    role: "Professor",
+                    sort_order: i,
+                  })),
                 });
               }
             }}

@@ -5,8 +5,8 @@ import type { PersonLite } from "../lib/types";
 export interface RosterRow {
   key: string; // role name, or EBD class id
   label: string;
-  personId: string | null;
-  personName?: string | null; // for read-only display without the people list
+  /** Current assignees, in order. `name` covers read-only tokens without /people. */
+  people: { id: string; name: string | null }[];
 }
 
 interface RosterEditorProps {
@@ -17,20 +17,37 @@ interface RosterEditorProps {
   editable: boolean;
   unavailableIds: Set<string>;
   saving?: boolean;
-  onSave: (rows: { key: string; personId: string | null }[]) => void;
+  onSave: (rows: { key: string; personIds: string[] }[]) => void;
 }
 
+// Each role holds any number of people (e.g. several "Voz" in Louvor).
+// Selecting "— remover —" on a slot drops it; the trailing select adds one.
 export function RosterEditor({ title, color, rows, people, editable, unavailableIds, saving, onSave }: RosterEditorProps) {
-  const [selection, setSelection] = useState<Record<string, string | null>>(
-    () => Object.fromEntries(rows.map((r) => [r.key, r.personId])),
+  const [selection, setSelection] = useState<Record<string, string[]>>(
+    () => Object.fromEntries(rows.map((r) => [r.key, r.people.map((p) => p.id)])),
   );
   const [dirty, setDirty] = useState(false);
 
-  const nameFor = (row: RosterRow) => {
-    const id = selection[row.key] ?? null;
-    if (!id) return "— por preencher —";
-    return people.find((p) => p.id === id)?.full_name ?? row.personName ?? "—";
+  const listFor = (key: string) => selection[key] ?? [];
+
+  const setSlot = (key: string, index: number, value: string) => {
+    setSelection((s) => {
+      const list = [...(s[key] ?? [])];
+      if (value === "") list.splice(index, 1);
+      else list[index] = value;
+      return { ...s, [key]: list };
+    });
+    setDirty(true);
   };
+
+  const addSlot = (key: string, value: string) => {
+    if (!value) return;
+    setSelection((s) => ({ ...s, [key]: [...(s[key] ?? []), value] }));
+    setDirty(true);
+  };
+
+  const nameOf = (row: RosterRow, id: string) =>
+    people.find((p) => p.id === id)?.full_name ?? row.people.find((p) => p.id === id)?.name ?? "—";
 
   return (
     <section className="rounded-lg border border-black/10 p-4 dark:border-white/10">
@@ -43,34 +60,61 @@ export function RosterEditor({ title, color, rows, people, editable, unavailable
       <ul className="space-y-2">
         {rows.length === 0 && <li className="text-sm text-black/50">Sem funções definidas.</li>}
         {rows.map((row) => {
-          const current = selection[row.key] ?? null;
-          const unavailable = current !== null && unavailableIds.has(current);
+          const list = listFor(row.key);
           return (
-            <li key={row.key} className="grid grid-cols-[minmax(6rem,9rem)_1fr] items-center gap-2">
-              <span className="text-sm text-black/70 dark:text-white/70">{row.label}</span>
+            <li key={row.key} className="grid grid-cols-[minmax(6rem,9rem)_1fr] items-start gap-2">
+              <span className="pt-1.5 text-sm text-black/70 dark:text-white/70">{row.label}</span>
               {editable ? (
-                <select
-                  value={current ?? ""}
-                  onChange={(e) => {
-                    setSelection((s) => ({ ...s, [row.key]: e.target.value || null }));
-                    setDirty(true);
-                  }}
-                  className={
-                    "w-full rounded-md border px-2 py-1.5 text-sm dark:bg-neutral-800 " +
-                    (unavailable ? "border-amber-500" : "border-black/15 dark:border-white/15")
-                  }
-                >
-                  <option value="">— por preencher —</option>
-                  {people.map((p) => (
-                    <option key={p.id} value={p.id}>
-                      {p.full_name}
-                    </option>
-                  ))}
-                </select>
+                <div className="flex flex-col gap-1">
+                  {list.map((personId, i) => {
+                    const unavailable = unavailableIds.has(personId);
+                    return (
+                      <select
+                        key={`${row.key}-${i}`}
+                        value={personId}
+                        onChange={(e) => setSlot(row.key, i, e.target.value)}
+                        className={
+                          "w-full rounded-md border px-2 py-1.5 text-sm dark:bg-neutral-800 " +
+                          (unavailable ? "border-amber-500" : "border-black/15 dark:border-white/15")
+                        }
+                      >
+                        <option value="">— remover —</option>
+                        {people.map((p) => (
+                          <option key={p.id} value={p.id}>
+                            {p.full_name}
+                          </option>
+                        ))}
+                      </select>
+                    );
+                  })}
+                  <select
+                    value=""
+                    onChange={(e) => addSlot(row.key, e.target.value)}
+                    className="w-full rounded-md border border-dashed border-black/20 px-2 py-1.5 text-sm text-black/50 dark:border-white/20 dark:bg-neutral-800 dark:text-white/50"
+                  >
+                    <option value="">+ adicionar pessoa…</option>
+                    {people
+                      .filter((p) => !list.includes(p.id))
+                      .map((p) => (
+                        <option key={p.id} value={p.id}>
+                          {p.full_name}
+                        </option>
+                      ))}
+                  </select>
+                </div>
               ) : (
-                <span className={"text-sm " + (unavailable ? "text-amber-600" : "")}>
-                  {nameFor(row)}
-                  {unavailable && " ⚠️"}
+                <span className="pt-1.5 text-sm">
+                  {list.length === 0 ? (
+                    <span className="text-black/40">— por preencher —</span>
+                  ) : (
+                    list.map((id, i) => (
+                      <span key={id} className={unavailableIds.has(id) ? "text-amber-600" : ""}>
+                        {i > 0 && <span className="text-black/40">, </span>}
+                        {nameOf(row, id)}
+                        {unavailableIds.has(id) && " ⚠️"}
+                      </span>
+                    ))
+                  )}
                 </span>
               )}
             </li>
@@ -84,7 +128,8 @@ export function RosterEditor({ title, color, rows, people, editable, unavailable
             type="button"
             disabled={!dirty || saving}
             onClick={() => {
-              onSave(rows.map((r) => ({ key: r.key, personId: selection[r.key] ?? null })));
+              // Dedupe accidental repeats of the same person within a role.
+              onSave(rows.map((r) => ({ key: r.key, personIds: [...new Set(listFor(r.key))] })));
               setDirty(false);
             }}
             className="rounded-md bg-blue-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"
