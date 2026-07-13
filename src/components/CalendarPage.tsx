@@ -12,6 +12,7 @@ import type { EventResizeDoneArg } from "@fullcalendar/interaction";
 import dayGridPlugin from "@fullcalendar/daygrid";
 import timeGridPlugin from "@fullcalendar/timegrid";
 import multiMonthPlugin from "@fullcalendar/multimonth";
+import listPlugin from "@fullcalendar/list";
 import interactionPlugin from "@fullcalendar/interaction";
 import luxonPlugin from "@fullcalendar/luxon3";
 import ptLocale from "@fullcalendar/core/locales/pt";
@@ -138,6 +139,27 @@ export function CalendarPage() {
     [session, navigate],
   );
 
+  // List view rows get a ministry tag after the title, so the continuous list
+  // reads "activity — ministry" without needing the colored dot legend.
+  const decorateListRow = useCallback(
+    (info: { event: { extendedProps: Record<string, unknown> }; el: HTMLElement; view: { type: string } }) => {
+      if (!info.view.type.startsWith("list")) return;
+      const row = info.event.extendedProps.row as EventRow | undefined;
+      if (!row) return; // cultos already say "Culto" in the title
+      const ministry = session.ministryById.get(row.ministry_id);
+      if (!ministry) return;
+      const titleEl = info.el.querySelector(".fc-list-event-title");
+      if (!titleEl) return;
+      const tag = document.createElement("span");
+      tag.textContent = ministry.name;
+      tag.style.cssText =
+        `margin-left:8px;font-size:0.72em;font-weight:600;padding:1px 8px;border-radius:9999px;` +
+        `background:${ministry.color}22;color:${ministry.color};vertical-align:middle;`;
+      titleEl.appendChild(tag);
+    },
+    [session],
+  );
+
   // Drag/resize: FullCalendar moves the event immediately; on failure we revert.
   const handleMove = useCallback(
     async (arg: EventDropArg | EventResizeDoneArg) => {
@@ -185,7 +207,7 @@ export function CalendarPage() {
       if (["INPUT", "SELECT", "TEXTAREA"].includes(el.tagName)) return;
       const api = calendarRef.current?.getApi();
       if (!api) return;
-      const map: Record<string, string> = { a: "multiMonthYear", m: "dayGridMonth", s: "timeGridWeek", d: "timeGridDay" };
+      const map: Record<string, string> = { a: "multiMonthYear", m: "dayGridMonth", s: "timeGridWeek", d: "timeGridDay", l: "listYear" };
       const view = map[e.key.toLowerCase()];
       if (view) {
         api.changeView(view);
@@ -234,7 +256,7 @@ export function CalendarPage() {
           )}
           <FullCalendar
             ref={calendarRef}
-            plugins={[dayGridPlugin, timeGridPlugin, multiMonthPlugin, interactionPlugin, luxonPlugin]}
+            plugins={[dayGridPlugin, timeGridPlugin, multiMonthPlugin, listPlugin, interactionPlugin, luxonPlugin]}
             timeZone={TIME_ZONE}
             locale={ptLocale}
             firstDay={1}
@@ -242,7 +264,7 @@ export function CalendarPage() {
             headerToolbar={{
               left: "prev,next today",
               center: "title",
-              right: "multiMonthYear,dayGridMonth,timeGridWeek,timeGridDay",
+              right: "multiMonthYear,dayGridMonth,timeGridWeek,timeGridDay,listYear",
             }}
             buttonText={{ today: "Hoje" }}
             views={{
@@ -250,7 +272,9 @@ export function CalendarPage() {
               dayGridMonth: { buttonText: "Mês" },
               timeGridWeek: { buttonText: "Semana" },
               timeGridDay: { buttonText: "Dia" },
+              listYear: { buttonText: "Lista" },
             }}
+            noEventsContent="Sem atividades neste período."
             height="auto"
             nowIndicator
             selectable={session.canCreate}
@@ -262,6 +286,7 @@ export function CalendarPage() {
             eventClick={handleEventClick}
             eventDrop={handleMove}
             eventResize={handleMove}
+            eventDidMount={decorateListRow}
           />
         </div>
       </div>

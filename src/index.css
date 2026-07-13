@@ -12,6 +12,17 @@ body,
   height: 100%;
 }
 
+/* FullCalendar in dark mode: the list view's day headers and hover states use
+   light neutrals by default and become unreadable. */
+@media (prefers-color-scheme: dark) {
+  .fc {
+    --fc-page-bg-color: transparent;
+    --fc-neutral-bg-color: rgba(255, 255, 255, 0.08);
+    --fc-list-event-hover-bg-color: rgba(255, 255, 255, 0.06);
+    --fc-border-color: rgba(255, 255, 255, 0.14);
+  }
+}
+
 /* Print: order of service on one clean A4 page (PROMPT.md section 10). */
 @media print {
   @page {
