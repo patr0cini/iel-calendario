@@ -19,8 +19,9 @@ export function EscalaPage() {
   const [params, setParams] = useSearchParams();
   const people = usePeople(session.canCreate);
 
-  // Presbitério included: its "Partilha da Ceia" roster is planned here too.
-  const selectable = session.ministries;
+  // Presbitério included (its "Partilha da Ceia" is planned here too). "Culto"
+  // is only a calendar bucket for the services — it has no roster.
+  const selectable = session.ministries.filter((m) => m.slug !== "culto");
   const ownSlug = session.ownMinistryId ? session.ministries.find((m) => m.id === session.ownMinistryId)?.slug : undefined;
   const slug = params.get("ministerio") ?? ownSlug ?? selectable[0]?.slug ?? "";
   const ministry = session.ministries.find((m) => m.slug === slug);

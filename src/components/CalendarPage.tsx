@@ -38,7 +38,9 @@ function serviceEndTime(startTime: string): string {
   return `${String(eh).padStart(2, "0")}:${String(em).padStart(2, "0")}`;
 }
 
-const FILTER_KEY = "iel.calendar.filter";
+// The filter stores HIDDEN ministry ids, so a ministry created later (e.g. by
+// the admin) is visible by default instead of silently filtered out.
+const HIDDEN_KEY = "iel.calendar.hidden";
 
 type ModalState =
   | { mode: "create"; defaultStart: string; defaultEnd: string }
@@ -58,18 +60,23 @@ export function CalendarPage() {
   const [modal, setModal] = useState<ModalState>(null);
   const [pageError, setPageError] = useState<string | null>(null);
 
-  const [selected, setSelected] = useState<Set<string>>(() => {
-    const stored = readStoredFilter();
-    return stored ?? new Set(session.ministries.map((m) => m.id));
-  });
+  const [hidden, setHidden] = useState<Set<string>>(() => readStoredHidden());
   useEffect(() => {
-    localStorage.setItem(FILTER_KEY, JSON.stringify([...selected]));
-  }, [selected]);
+    localStorage.setItem(HIDDEN_KEY, JSON.stringify([...hidden]));
+  }, [hidden]);
+  const selected = useMemo(
+    () => new Set(session.ministries.filter((m) => !hidden.has(m.id)).map((m) => m.id)),
+    [session.ministries, hidden],
+  );
 
   const eventsQuery = useEventsQuery(range);
   const servicesQuery = useServicesQuery(range);
   const { createEvent, updateEvent, deleteEvent } = useEventMutations();
   const saving = createEvent.isPending || updateEvent.isPending || deleteEvent.isPending;
+
+  // Sunday services belong to the "Culto" ministry: its checkbox hides them and
+  // its color (editable in Administração) paints them.
+  const cultoMinistry = session.ministries.find((m) => m.slug === "culto");
 
   const fcEvents: FcEventInput[] = useMemo(() => {
     const rows = eventsQuery.data ?? [];
@@ -91,26 +98,29 @@ export function CalendarPage() {
         };
       });
 
-    // Sunday services are always shown — the culto belongs to the whole church.
+    const showServices = !cultoMinistry || selected.has(cultoMinistry.id);
+    const serviceColor = cultoMinistry?.color ?? SERVICE_COLOR;
     // Naive datetimes (no offset) are interpreted in the calendar's timezone.
-    const serviceEvents: FcEventInput[] = (servicesQuery.data ?? []).map((s) => {
-      const startTime = s.service_time.slice(0, 5);
-      const base = s.label?.trim() || (isFirstSundayOfMonth(s.service_date) ? "Culto de Ceia" : "Culto");
-      return {
-        id: `svc-${s.id}`,
-        title: s.theme ? `${base} — ${s.theme}` : base,
-        start: `${s.service_date}T${startTime}:00`,
-        end: `${s.service_date}T${serviceEndTime(startTime)}:00`,
-        backgroundColor: SERVICE_COLOR,
-        borderColor: SERVICE_COLOR,
-        editable: false,
-        classNames: ["cursor-pointer"],
-        extendedProps: { serviceDate: s.service_date },
-      };
-    });
+    const serviceEvents: FcEventInput[] = !showServices
+      ? []
+      : (servicesQuery.data ?? []).map((s) => {
+          const startTime = s.service_time.slice(0, 5);
+          const base = s.label?.trim() || (isFirstSundayOfMonth(s.service_date) ? "Culto de Ceia" : "Culto");
+          return {
+            id: `svc-${s.id}`,
+            title: s.theme ? `${base} — ${s.theme}` : base,
+            start: `${s.service_date}T${startTime}:00`,
+            end: `${s.service_date}T${serviceEndTime(startTime)}:00`,
+            backgroundColor: serviceColor,
+            borderColor: serviceColor,
+            editable: false,
+            classNames: ["cursor-pointer"],
+            extendedProps: { serviceDate: s.service_date },
+          };
+        });
 
     return [...ministryEvents, ...serviceEvents];
-  }, [eventsQuery.data, servicesQuery.data, selected, session]);
+  }, [eventsQuery.data, servicesQuery.data, selected, session, cultoMinistry]);
 
   const handleDatesSet = useCallback((arg: DatesSetArg) => {
     setRange({ from: arg.start.toISOString(), to: arg.end.toISOString() });
@@ -240,14 +250,14 @@ export function CalendarPage() {
           ministries={session.ministries}
           selected={selected}
           onToggle={(id) =>
-            setSelected((prev) => {
+            setHidden((prev) => {
               const next = new Set(prev);
               next.has(id) ? next.delete(id) : next.add(id);
               return next;
             })
           }
-          onAll={() => setSelected(new Set(session.ministries.map((m) => m.id)))}
-          onNone={() => setSelected(new Set())}
+          onAll={() => setHidden(new Set())}
+          onNone={() => setHidden(new Set(session.ministries.map((m) => m.id)))}
         />
 
         <div className="min-w-0 flex-1">
@@ -330,13 +340,13 @@ function Header({ session }: { session: ReturnType<typeof useSession> }) {
   );
 }
 
-function readStoredFilter(): Set<string> | null {
+function readStoredHidden(): Set<string> {
   try {
-    const raw = localStorage.getItem(FILTER_KEY);
-    if (!raw) return null;
+    const raw = localStorage.getItem(HIDDEN_KEY);
+    if (!raw) return new Set();
     const arr = JSON.parse(raw) as unknown;
-    return Array.isArray(arr) ? new Set(arr.filter((x): x is string => typeof x === "string")) : null;
+    return Array.isArray(arr) ? new Set(arr.filter((x): x is string => typeof x === "string")) : new Set();
   } catch {
-    return null;
+    return new Set();
   }
 }

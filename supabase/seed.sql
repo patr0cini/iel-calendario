@@ -3,6 +3,7 @@
 -- their SHA-256 hash is ever stored.
 
 insert into ministries (slug, name, color, sort_order) values
+  ('culto', 'Culto', '#a16207', 0), -- Sunday services take this color/filter in the calendar
   ('presbiterio', 'Presbitério', '#7c3aed', 1),
   ('louvor', 'Louvor', '#2563eb', 2),
   ('multimedia', 'Multimédia', '#059669', 3),
