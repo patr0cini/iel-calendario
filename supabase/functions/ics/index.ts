@@ -163,7 +163,9 @@ Deno.serve(async (req) => {
     for (const s of services.data ?? []) {
       const start = lisbonToUtc(s.service_date, s.service_time);
       const end = new Date(start.getTime() + 120 * 60_000); // culto 10:30–12:30
-      const title = s.label?.trim() || "Culto";
+      // First Sunday of the month = communion service.
+      const isCeia = Number(s.service_date.slice(8, 10)) <= 7;
+      const title = s.label?.trim() || (isCeia ? "Culto de Ceia" : "Culto");
       const detail = [s.theme && `Tema: ${s.theme}`, s.scripture && `Texto: ${s.scripture}`]
         .filter(Boolean)
         .join("\n");

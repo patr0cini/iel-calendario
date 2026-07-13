@@ -19,7 +19,7 @@ import ptLocale from "@fullcalendar/core/locales/pt";
 import { useSession } from "../session/SessionProvider";
 import { useEventsQuery, useEventMutations, type Range } from "../hooks/useEvents";
 import { useServicesQuery } from "../hooks/useServices";
-import { TIME_ZONE } from "../lib/datetime";
+import { TIME_ZONE, isFirstSundayOfMonth } from "../lib/datetime";
 import type { EventInput, EventRow, Ministry } from "../lib/types";
 import { MinistryFilter } from "./MinistryFilter";
 import { EventModal } from "./EventModal";
@@ -94,9 +94,10 @@ export function CalendarPage() {
     // Naive datetimes (no offset) are interpreted in the calendar's timezone.
     const serviceEvents: FcEventInput[] = (servicesQuery.data ?? []).map((s) => {
       const startTime = s.service_time.slice(0, 5);
+      const base = s.label?.trim() || (isFirstSundayOfMonth(s.service_date) ? "Culto de Ceia" : "Culto");
       return {
         id: `svc-${s.id}`,
-        title: s.theme ? `Culto — ${s.theme}` : (s.label?.trim() || "Culto"),
+        title: s.theme ? `${base} — ${s.theme}` : base,
         start: `${s.service_date}T${startTime}:00`,
         end: `${s.service_date}T${serviceEndTime(startTime)}:00`,
         backgroundColor: SERVICE_COLOR,

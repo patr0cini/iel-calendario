@@ -6,7 +6,7 @@ import { pt } from "date-fns/locale";
 import { useSession } from "../session/SessionProvider";
 import { usePeople } from "../hooks/usePeople";
 import { useServiceAdmin, useServiceDetail, useServiceMutations } from "../hooks/useService";
-import { TIME_ZONE } from "../lib/datetime";
+import { TIME_ZONE, isFirstSundayOfMonth } from "../lib/datetime";
 import type { Ministry, ServiceDetail } from "../lib/types";
 import { RosterEditor, type RosterRow } from "./RosterEditor";
 import { SongsEditor } from "./SongsEditor";
@@ -88,10 +88,17 @@ function ServiceView({
 
   const conflicts = useMemo(() => computeConflicts(detail), [detail]);
 
-  const sectionMinistries = ["louvor", "multimedia", "assistentes"]
+  // First Sunday of the month = communion service: the Presbitério section
+  // (Partilha da Ceia) appears, and there is no Sunday School.
+  const isCeia = isFirstSundayOfMonth(detail.service.service_date);
+
+  const sectionMinistries = (isCeia
+    ? ["presbiterio", "louvor", "multimedia", "assistentes"]
+    : ["louvor", "multimedia", "assistentes"]
+  )
     .map((slug) => bySlug.get(slug))
     .filter((m): m is Ministry => Boolean(m));
-  const ebdMinistry = bySlug.get("ebd");
+  const ebdMinistry = isCeia ? undefined : bySlug.get("ebd");
   const canEditEbd = ebdMinistry ? canEditMinistry(ebdMinistry) : false;
 
   return (
@@ -108,7 +115,14 @@ function ServiceView({
       </div>
 
       <h1 className="text-xl font-bold capitalize sm:text-2xl">{formatDate(detail.service.service_date)}</h1>
-      <p className="mb-4 text-sm text-black/60 dark:text-white/60">às {detail.service.service_time.slice(0, 5)}</p>
+      <p className="mb-4 flex items-center gap-2 text-sm text-black/60 dark:text-white/60">
+        às {detail.service.service_time.slice(0, 5)}
+        {isCeia && (
+          <span className="rounded-full bg-amber-500/15 px-2.5 py-0.5 text-xs font-semibold text-amber-700 dark:text-amber-300">
+            Culto de Ceia
+          </span>
+        )}
+      </p>
 
       <ServiceHeaderCard
         service={detail.service}

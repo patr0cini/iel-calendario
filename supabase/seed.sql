@@ -12,10 +12,12 @@ insert into ministries (slug, name, color, sort_order) values
 on conflict (slug) do nothing;
 
 -- Ministry roles (editable by the Presbitério later — PROMPT §13).
+-- "Partilha da Ceia" belongs to Presbitério: first Sundays are communion services.
 insert into ministry_roles (ministry_id, name, sort_order)
 select m.id, r.name, r.sort_order
 from ministries m
 join (values
+  ('presbiterio', 'Partilha da Ceia', 1),
   ('louvor', 'Dirigente', 1),
   ('louvor', 'Voz', 2),
   ('louvor', 'Teclas', 3),

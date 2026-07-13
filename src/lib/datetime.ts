@@ -15,6 +15,14 @@ export function localInputToIso(value: string): string {
   return fromZonedTime(value, TIME_ZONE).toISOString();
 }
 
+/**
+ * First Sunday of the month = communion service (culto de ceia). Services are
+ * always Sundays, so day-of-month <= 7 suffices.
+ */
+export function isFirstSundayOfMonth(dateIso: string): boolean {
+  return Number(dateIso.slice(8, 10)) <= 7;
+}
+
 /** Human-readable range for display, e.g. "6 set 2026, 18:00–19:30". */
 export function formatRange(startIso: string, endIso: string, allDay: boolean): string {
   if (allDay) return formatInTimeZone(new Date(startIso), TIME_ZONE, "d 'de' MMMM 'de' yyyy");
