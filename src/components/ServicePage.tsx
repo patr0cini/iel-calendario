@@ -5,6 +5,7 @@ import { pt } from "date-fns/locale";
 
 import { useSession } from "../session/SessionProvider";
 import { usePeople } from "../hooks/usePeople";
+import { useMemberships } from "../hooks/useMemberships";
 import { useServiceAdmin, useServiceDetail, useServiceMutations } from "../hooks/useService";
 import { TIME_ZONE, isFirstSundayOfMonth } from "../lib/datetime";
 import type { Ministry, ServiceDetail } from "../lib/types";
@@ -66,6 +67,7 @@ function ServiceView({
 }) {
   const { updateHeader, saveAssignments, saveSongs, saveEbd } = useServiceMutations(detail.service.id, dateParam);
   const [savingKey, setSavingKey] = useState<string | null>(null);
+  const { byMinistry: membersByMinistry } = useMemberships(session.canCreate);
 
   const unavailable = useMemo(() => new Set(detail.unavailable_person_ids), [detail.unavailable_person_ids]);
   const bySlug = useMemo(() => new Map(detail.ministries.map((m) => [m.slug, m])), [detail.ministries]);
@@ -166,6 +168,7 @@ function ServiceView({
             color={m.color}
             rows={rolesFor(m)}
             people={peopleData}
+            memberIds={membersByMinistry.get(m.id)}
             editable={canEditMinistry(m)}
             unavailableIds={unavailable}
             saving={savingKey === m.slug && saveAssignments.isPending}
@@ -208,6 +211,7 @@ function ServiceView({
                 .map((x) => ({ id: x.person_id as string, name: x.person_name })),
             }))}
             people={peopleData}
+            memberIds={ebdMinistry ? membersByMinistry.get(ebdMinistry.id) : undefined}
             editable={canEditEbd}
             unavailableIds={unavailable}
             saving={savingKey === "ebd" && saveEbd.isPending}

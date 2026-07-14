@@ -14,15 +14,62 @@ interface RosterEditorProps {
   color: string;
   rows: RosterRow[];
   people: PersonLite[];
+  /** Members of this ministry: listed first; everyone else under "Outras pessoas". */
+  memberIds?: Set<string>;
   editable: boolean;
   unavailableIds: Set<string>;
   saving?: boolean;
   onSave: (rows: { key: string; personIds: string[] }[]) => void;
 }
 
+// Ministry members first, the rest grouped at the bottom — borrowing someone
+// from another ministry stays possible without drowning the common case.
+export function PersonOptions({
+  people,
+  memberIds,
+  exclude,
+}: {
+  people: PersonLite[];
+  memberIds?: Set<string>;
+  exclude?: Set<string>;
+}) {
+  const visible = exclude ? people.filter((p) => !exclude.has(p.id)) : people;
+  if (!memberIds || memberIds.size === 0) {
+    return (
+      <>
+        {visible.map((p) => (
+          <option key={p.id} value={p.id}>
+            {p.full_name}
+          </option>
+        ))}
+      </>
+    );
+  }
+  const members = visible.filter((p) => memberIds.has(p.id));
+  const others = visible.filter((p) => !memberIds.has(p.id));
+  return (
+    <>
+      {members.map((p) => (
+        <option key={p.id} value={p.id}>
+          {p.full_name}
+        </option>
+      ))}
+      {others.length > 0 && (
+        <optgroup label="— Outras pessoas —">
+          {others.map((p) => (
+            <option key={p.id} value={p.id}>
+              {p.full_name}
+            </option>
+          ))}
+        </optgroup>
+      )}
+    </>
+  );
+}
+
 // Each role holds any number of people (e.g. several "Voz" in Louvor).
 // Selecting "— remover —" on a slot drops it; the trailing select adds one.
-export function RosterEditor({ title, color, rows, people, editable, unavailableIds, saving, onSave }: RosterEditorProps) {
+export function RosterEditor({ title, color, rows, people, memberIds, editable, unavailableIds, saving, onSave }: RosterEditorProps) {
   const [selection, setSelection] = useState<Record<string, string[]>>(
     () => Object.fromEntries(rows.map((r) => [r.key, r.people.map((p) => p.id)])),
   );
@@ -79,11 +126,7 @@ export function RosterEditor({ title, color, rows, people, editable, unavailable
                         }
                       >
                         <option value="">— remover —</option>
-                        {people.map((p) => (
-                          <option key={p.id} value={p.id}>
-                            {p.full_name}
-                          </option>
-                        ))}
+                        <PersonOptions people={people} memberIds={memberIds} />
                       </select>
                     );
                   })}
@@ -93,13 +136,7 @@ export function RosterEditor({ title, color, rows, people, editable, unavailable
                     className="w-full rounded-md border border-dashed border-black/20 px-2 py-1.5 text-sm text-black/50 dark:border-white/20 dark:bg-neutral-800 dark:text-white/50"
                   >
                     <option value="">+ adicionar pessoa…</option>
-                    {people
-                      .filter((p) => !list.includes(p.id))
-                      .map((p) => (
-                        <option key={p.id} value={p.id}>
-                          {p.full_name}
-                        </option>
-                      ))}
+                    <PersonOptions people={people} memberIds={memberIds} exclude={new Set(list)} />
                   </select>
                 </div>
               ) : (

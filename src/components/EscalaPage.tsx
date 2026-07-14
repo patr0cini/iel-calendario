@@ -6,6 +6,8 @@ import { pt } from "date-fns/locale";
 
 import { useSession } from "../session/SessionProvider";
 import { usePeople } from "../hooks/usePeople";
+import { useMemberships } from "../hooks/useMemberships";
+import { PersonOptions } from "./RosterEditor";
 import { apiFetch } from "../lib/api";
 import { TIME_ZONE } from "../lib/datetime";
 import type { AssignmentInput, ServiceDetail, ServiceHeader } from "../lib/types";
@@ -18,6 +20,7 @@ export function EscalaPage() {
   const qc = useQueryClient();
   const [params, setParams] = useSearchParams();
   const people = usePeople(session.canCreate);
+  const { byMinistry: membersByMinistry } = useMemberships(session.canCreate);
 
   // Presbitério included (its "Partilha da Ceia" is planned here too). "Culto"
   // is only a calendar bucket for the services — it has no roster.
@@ -151,9 +154,10 @@ export function EscalaPage() {
                           onChange={(e) => applyChange(slotIndex, e.target.value)}
                         >
                           <option value="">{slotIndex === -1 ? "+" : "— remover —"}</option>
-                          {peopleList.map((p) => (
-                            <option key={p.id} value={p.id}>{p.full_name}</option>
-                          ))}
+                          <PersonOptions
+                            people={peopleList}
+                            memberIds={ministry ? membersByMinistry.get(ministry.id) : undefined}
+                          />
                         </select>
                       );
 
