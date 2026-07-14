@@ -9,7 +9,8 @@ insert into ministries (slug, name, color, sort_order) values
   ('multimedia', 'Multimédia', '#059669', 3),
   ('assistentes', 'Assistentes', '#d97706', 4),
   ('ebd', 'Escola Bíblica Dominical', '#dc2626', 5),
-  ('412', '412 (Adolescentes e Jovens)', '#db2777', 6)
+  ('412', '412 (Adolescentes e Jovens)', '#db2777', 6),
+  ('convidados', 'Convidados', '#64748b', 7) -- guest preachers pool
 on conflict (slug) do nothing;
 
 -- Ministry roles (editable by the Presbitério later — PROMPT §13).

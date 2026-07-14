@@ -7,10 +7,13 @@ import { pt } from "date-fns/locale";
 import { useSession } from "../session/SessionProvider";
 import { usePeople } from "../hooks/usePeople";
 import { useMemberships } from "../hooks/useMemberships";
-import { PersonOptions } from "./RosterEditor";
+import { PersonPicker, PersonChip, normalizeText } from "./PersonPicker";
 import { apiFetch } from "../lib/api";
-import { TIME_ZONE } from "../lib/datetime";
+import { TIME_ZONE, isFirstSundayOfMonth } from "../lib/datetime";
 import type { AssignmentInput, ServiceDetail, ServiceHeader } from "../lib/types";
+
+// Communion roles ("Ceia", "Partilha da Ceia") only exist on first Sundays.
+const isCeiaRole = (name: string) => normalizeText(name).includes("ceia");
 
 const today = () => formatInTimeZone(new Date(), TIME_ZONE, "yyyy-MM-dd");
 const shortDate = (d: string) => formatInTimeZone(new Date(`${d}T12:00:00Z`), TIME_ZONE, "d MMM", { locale: pt });
@@ -118,12 +121,20 @@ export function EscalaPage() {
                       <Link to={`/culto/${s.service_date}`} className="text-blue-600 hover:underline">{shortDate(s.service_date)}</Link>
                     </td>
                     {roles.map((r) => {
+                      // Communion roles only apply to first Sundays.
+                      if (isCeiaRole(r.name) && !isFirstSundayOfMonth(s.service_date)) {
+                        return (
+                          <td key={r.id} className="p-1 align-top">
+                            <span className="text-black/20 dark:text-white/20" title="Só nos cultos de ceia">·</span>
+                          </td>
+                        );
+                      }
                       // A role may hold several people (e.g. several "Voz").
                       const assigned = mine.filter((a) => a.role === r.name && a.person_id);
 
                       // Rebuilds the whole ministry roster for this service after
                       // changing one slot of one role, then saves immediately.
-                      const applyChange = (slotIndex: number, newValue: string) => {
+                      const applyChange = (removeIndex: number, addId: string | null) => {
                         if (!detail) return;
                         const byRole = new Map<string, (string | null)[]>(
                           roles.map((rr) => [
@@ -132,9 +143,8 @@ export function EscalaPage() {
                           ]),
                         );
                         const list = [...(byRole.get(r.name) ?? [])];
-                        if (slotIndex === -1) list.push(newValue);
-                        else if (newValue === "") list.splice(slotIndex, 1);
-                        else list[slotIndex] = newValue;
+                        if (removeIndex >= 0) list.splice(removeIndex, 1);
+                        if (addId) list.push(addId);
                         byRole.set(r.name, [...new Set(list)]);
                         const assignments = roles.flatMap((rr, ri) =>
                           (byRole.get(rr.name) ?? []).map((pid, i) => ({
@@ -146,46 +156,34 @@ export function EscalaPage() {
                         saveCell.mutate({ serviceId: detail.service.id, date: s.service_date, assignments });
                       };
 
-                      const cellSelect = (value: string, slotIndex: number, isUnavail: boolean) => (
-                        <select
-                          key={slotIndex}
-                          value={value}
-                          className={"w-full rounded border px-1 py-1 text-sm dark:bg-neutral-800 " + (isUnavail ? "border-amber-500" : "border-black/10 dark:border-white/10")}
-                          onChange={(e) => applyChange(slotIndex, e.target.value)}
-                        >
-                          <option value="">{slotIndex === -1 ? "+" : "— remover —"}</option>
-                          <PersonOptions
-                            people={peopleList}
-                            memberIds={ministry ? membersByMinistry.get(ministry.id) : undefined}
-                          />
-                        </select>
-                      );
-
                       return (
-                        <td key={r.id} className="p-1 align-top">
-                          {editable && detail ? (
-                            <div className="flex flex-col gap-1">
-                              {assigned.map((a, i) => cellSelect(a.person_id as string, i, unavailable.has(a.person_id as string)))}
-                              {cellSelect("", -1, false)}
-                            </div>
-                          ) : (
-                            <span>
-                              {assigned.length === 0 ? (
-                                <span className="text-black/25">—</span>
-                              ) : (
-                                assigned.map((a, i) => {
-                                  const isUnavail = unavailable.has(a.person_id as string);
-                                  return (
-                                    <span key={a.id} className={isUnavail ? "text-amber-600" : ""}>
-                                      {i > 0 && <span className="text-black/40">, </span>}
-                                      {a.person_name ?? "•"}
-                                      {isUnavail && " ⚠️"}
-                                    </span>
-                                  );
-                                })
-                              )}
-                            </span>
-                          )}
+                        <td key={r.id} className="min-w-36 p-1 align-top">
+                          <div className="flex flex-col gap-1">
+                            {assigned.length > 0 && (
+                              <div className="flex flex-wrap gap-1">
+                                {assigned.map((a, i) => (
+                                  <PersonChip
+                                    key={a.id}
+                                    compact
+                                    name={a.person_name ?? "•"}
+                                    unavailable={unavailable.has(a.person_id as string)}
+                                    onRemove={editable && detail ? () => applyChange(i, null) : undefined}
+                                  />
+                                ))}
+                              </div>
+                            )}
+                            {!editable && assigned.length === 0 && <span className="text-black/25">—</span>}
+                            {editable && detail && (
+                              <PersonPicker
+                                compact
+                                people={peopleList}
+                                memberIds={ministry ? membersByMinistry.get(ministry.id) : undefined}
+                                exclude={new Set(assigned.map((a) => a.person_id as string))}
+                                placeholder="+ nome…"
+                                onPick={(p) => applyChange(-1, p.id)}
+                              />
+                            )}
+                          </div>
                         </td>
                       );
                     })}

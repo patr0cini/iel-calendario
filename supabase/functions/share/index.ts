@@ -38,8 +38,19 @@ const MOMENT_LABEL: Record<string, string> = {
 
 type Min = ServiceDetail["ministries"][number];
 
-function rosterHtml(detail: ServiceDetail, m: Min): string {
-  const roles = detail.ministry_roles.filter((r) => r.ministry_id === m.id).map((r) => r.name as string);
+// Communion roles ("Ceia", "Partilha da Ceia") only exist on first Sundays.
+function isCeiaRole(name: string): boolean {
+  return name
+    .normalize("NFD")
+    .replace(/[̀-ͯ]/g, "")
+    .toLowerCase()
+    .includes("ceia");
+}
+
+function rosterHtml(detail: ServiceDetail, m: Min, isCeia: boolean): string {
+  const roles = detail.ministry_roles
+    .filter((r) => r.ministry_id === m.id && (isCeia || !isCeiaRole(r.name as string)))
+    .map((r) => r.name as string);
   // Legacy assignments whose role is no longer in the editable list still show.
   for (const a of detail.assignments) {
     if (a.ministry_id === m.id && !roles.includes(a.role as string)) roles.push(a.role as string);
@@ -94,7 +105,6 @@ function pageHtml(detail: ServiceDetail, ministryFilter: string): string {
   const headerRows = [
     s.theme && `<tr><td class="k">Tema</td><td>${esc(s.theme)}</td></tr>`,
     s.scripture && `<tr><td class="k">Texto</td><td>${esc(s.scripture)}</td></tr>`,
-    s.leader_name && `<tr><td class="k">Dirigente</td><td>${esc(s.leader_name)}</td></tr>`,
     s.preacher_name && `<tr><td class="k">Pregador</td><td>${esc(s.preacher_name)}</td></tr>`,
     s.notes && `<tr><td class="k">Notas</td><td>${esc(s.notes)}</td></tr>`,
   ]
@@ -118,11 +128,11 @@ function pageHtml(detail: ServiceDetail, ministryFilter: string): string {
     if (only.slug === "ebd") {
       if (!isCeia) sections.push(ebdHtml(detail));
     } else {
-      sections.push(rosterHtml(detail, only));
+      sections.push(rosterHtml(detail, only, isCeia));
     }
   } else {
     if (bySlug.get("louvor")) sections.push(songsHtml(detail));
-    for (const m of rosterMinistries) sections.push(rosterHtml(detail, m));
+    for (const m of rosterMinistries) sections.push(rosterHtml(detail, m, isCeia));
     if (!isCeia) sections.push(ebdHtml(detail));
   }
 

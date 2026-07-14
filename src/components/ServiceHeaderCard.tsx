@@ -1,20 +1,22 @@
 import { useState } from "react";
 
 import type { PersonLite, ServiceHeader } from "../lib/types";
+import { PersonPicker, PersonChip } from "./PersonPicker";
 
 interface ServiceHeaderCardProps {
   service: ServiceHeader;
-  people: PersonLite[];
+  /** Preacher candidates: members of Presbitério or Convidados only. */
+  preacherOptions: PersonLite[];
   editable: boolean;
   saving?: boolean;
   onSave: (patch: Partial<ServiceHeader>) => void;
 }
 
-export function ServiceHeaderCard({ service, people, editable, saving, onSave }: ServiceHeaderCardProps) {
+export function ServiceHeaderCard({ service, preacherOptions, editable, saving, onSave }: ServiceHeaderCardProps) {
   const [theme, setTheme] = useState(service.theme ?? "");
   const [scripture, setScripture] = useState(service.scripture ?? "");
-  const [leaderId, setLeaderId] = useState(service.leader_id ?? "");
   const [preacherId, setPreacherId] = useState(service.preacher_id ?? "");
+  const [preacherName, setPreacherName] = useState(service.preacher_name ?? "");
   const [notes, setNotes] = useState(service.notes ?? "");
   const [dirty, setDirty] = useState(false);
 
@@ -28,7 +30,6 @@ export function ServiceHeaderCard({ service, people, editable, saving, onSave }:
       <dl className="grid grid-cols-[7rem_1fr] gap-x-3 gap-y-1 rounded-lg border border-black/10 p-4 text-sm dark:border-white/10">
         <Row label="Tema" value={service.theme} />
         <Row label="Texto" value={service.scripture} />
-        <Row label="Dirigente" value={service.leader_name} />
         <Row label="Pregador" value={service.preacher_name} />
         {service.notes && <Row label="Notas" value={service.notes} />}
       </dl>
@@ -44,13 +45,31 @@ export function ServiceHeaderCard({ service, people, editable, saving, onSave }:
         <Field label="Texto">
           <input value={scripture} onChange={(e) => touch(setScripture)(e.target.value)} className={input} />
         </Field>
-        <Field label="Dirigente">
-          <PersonSelect value={leaderId} people={people} onChange={touch(setLeaderId)} />
-        </Field>
-        <Field label="Pregador">
-          <PersonSelect value={preacherId} people={people} onChange={touch(setPreacherId)} />
-        </Field>
       </div>
+      <Field label="Pregador (Presbitério ou Convidados)">
+        {preacherId ? (
+          <PersonChip
+            name={preacherName || "—"}
+            onRemove={() => {
+              touch(setPreacherId)("");
+              setPreacherName("");
+            }}
+          />
+        ) : preacherOptions.length === 0 ? (
+          <p className="text-xs text-black/50 dark:text-white/50">
+            Sem candidatos: associa pessoas ao Presbitério ou ao ministério «Convidados» na Administração.
+          </p>
+        ) : (
+          <PersonPicker
+            people={preacherOptions}
+            placeholder="Procurar pregador…"
+            onPick={(p) => {
+              touch(setPreacherId)(p.id);
+              setPreacherName(p.full_name);
+            }}
+          />
+        )}
+      </Field>
       <Field label="Notas">
         <textarea value={notes} onChange={(e) => touch(setNotes)(e.target.value)} rows={2} className={input} />
       </Field>
@@ -62,7 +81,6 @@ export function ServiceHeaderCard({ service, people, editable, saving, onSave }:
             onSave({
               theme: theme.trim() || null,
               scripture: scripture.trim() || null,
-              leader_id: leaderId || null,
               preacher_id: preacherId || null,
               notes: notes.trim() || null,
             });
@@ -74,17 +92,6 @@ export function ServiceHeaderCard({ service, people, editable, saving, onSave }:
         </button>
       </div>
     </div>
-  );
-}
-
-function PersonSelect({ value, people, onChange }: { value: string; people: PersonLite[]; onChange: (v: string) => void }) {
-  return (
-    <select value={value} onChange={(e) => onChange(e.target.value)} className={input}>
-      <option value="">—</option>
-      {people.map((p) => (
-        <option key={p.id} value={p.id}>{p.full_name}</option>
-      ))}
-    </select>
   );
 }
 

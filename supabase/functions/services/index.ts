@@ -130,6 +130,18 @@ Deno.serve(async (req) => {
         }
         const { data: before } = await db.from("services").select("*").eq("id", id).maybeSingle();
         if (!before) throw new HttpError(404, "service not found");
+        // The preacher must belong to Presbitério or Convidados.
+        if (body.preacher_id) {
+          const { data: allowed } = await db
+            .from("ministry_members")
+            .select("id, ministries!inner(slug)")
+            .eq("person_id", body.preacher_id)
+            .in("ministries.slug", ["presbiterio", "convidados"])
+            .limit(1);
+          if (!allowed || allowed.length === 0) {
+            throw new HttpError(400, "o pregador deve pertencer ao Presbitério ou aos Convidados");
+          }
+        }
         const { data, error } = await db
           .from("services")
           .update({

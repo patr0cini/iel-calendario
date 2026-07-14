@@ -12,6 +12,7 @@ import type { Ministry, ServiceDetail } from "../lib/types";
 import { RosterEditor, type RosterRow } from "./RosterEditor";
 import { SongsEditor } from "./SongsEditor";
 import { ServiceHeaderCard } from "./ServiceHeaderCard";
+import { normalizeText } from "./PersonPicker";
 import { ShareButton } from "./ShareButton";
 
 function formatDate(date: string): string {
@@ -78,9 +79,15 @@ function ServiceView({
   const ownSlug = session.ownMinistryId ? bySlug.get(session.ownMinistryId)?.slug ?? null : null;
   const canEditSongs = session.scope === "admin" || (session.scope === "ministry" && ownSlug === "louvor");
 
+  // First Sunday of the month = communion service: the Presbitério section
+  // (Partilha da Ceia) appears, and there is no Sunday School. Communion roles
+  // ("Ceia", "Partilha da Ceia") only exist on those Sundays.
+  const isCeia = isFirstSundayOfMonth(detail.service.service_date);
+  const isCeiaRole = (name: string) => normalizeText(name).includes("ceia");
+
   const rolesFor = (m: Ministry): RosterRow[] =>
     detail.ministry_roles
-      .filter((r) => r.ministry_id === m.id)
+      .filter((r) => r.ministry_id === m.id && (isCeia || !isCeiaRole(r.name)))
       .map((r) => ({
         key: r.name,
         label: r.name,
@@ -90,10 +97,6 @@ function ServiceView({
       }));
 
   const conflicts = useMemo(() => computeConflicts(detail), [detail]);
-
-  // First Sunday of the month = communion service: the Presbitério section
-  // (Partilha da Ceia) appears, and there is no Sunday School.
-  const isCeia = isFirstSundayOfMonth(detail.service.service_date);
 
   // Data-driven sections: any ministry with defined roles gets a roster block
   // (so new ministries appear automatically). EBD has its own block; the
@@ -108,6 +111,17 @@ function ServiceView({
   );
   const ebdMinistry = isCeia ? undefined : bySlug.get("ebd");
   const canEditEbd = ebdMinistry ? canEditMinistry(ebdMinistry) : false;
+
+  // The preacher is exclusive to Presbitério and Convidados members.
+  const preacherOptions = useMemo(() => {
+    const allowed = new Set<string>();
+    for (const slug of ["presbiterio", "convidados"]) {
+      const m = bySlug.get(slug);
+      if (!m) continue;
+      for (const id of membersByMinistry.get(m.id) ?? []) allowed.add(id);
+    }
+    return peopleData.filter((p) => allowed.has(p.id));
+  }, [bySlug, membersByMinistry, peopleData]);
 
   return (
     <div className="mx-auto max-w-3xl px-4 py-6 print-area">
@@ -139,8 +153,9 @@ function ServiceView({
       </p>
 
       <ServiceHeaderCard
+        key={detail.service.id}
         service={detail.service}
-        people={peopleData}
+        preacherOptions={preacherOptions}
         editable={session.scope === "admin"}
         saving={updateHeader.isPending}
         onSave={(patch) => updateHeader.mutate(patch)}
