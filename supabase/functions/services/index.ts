@@ -31,6 +31,8 @@ interface ServiceHeaderInput {
   preacher_id?: string | null;
   leader_id?: string | null;
   notes?: string | null;
+  ebd_theme?: string | null;
+  ebd_notes?: string | null;
 }
 
 interface AssignmentInput {
@@ -153,8 +155,17 @@ Deno.serve(async (req) => {
     if (seg.length === 1) {
       if (req.method === "GET") return jsonResponse(req, 200, await buildDetail(db, id));
       if (req.method === "PATCH") {
-        requireScope(identity, "admin");
         const body = await readJson<ServiceHeaderInput>(req);
+        // The EBD ministry may edit its own lesson fields; everything else in
+        // the header (theme, preacher, dates…) stays admin-only.
+        const keys = Object.keys(body);
+        const ebdOnly = keys.length > 0 && keys.every((k) => k === "ebd_theme" || k === "ebd_notes");
+        if (ebdOnly && identity.scope !== "admin") {
+          const ebdId = await ministryIdBySlug(db, "ebd");
+          assertMinistryWrite(identity, ebdId);
+        } else {
+          requireScope(identity, "admin");
+        }
         const { data: before } = await db.from("services").select("*").eq("id", id).maybeSingle();
         if (!before) throw new HttpError(404, "service not found");
         const { data, error } = await db
@@ -168,6 +179,8 @@ Deno.serve(async (req) => {
             ...(body.preacher_id !== undefined && { preacher_id: body.preacher_id }),
             ...(body.leader_id !== undefined && { leader_id: body.leader_id }),
             ...(body.notes !== undefined && { notes: body.notes }),
+            ...(body.ebd_theme !== undefined && { ebd_theme: body.ebd_theme }),
+            ...(body.ebd_notes !== undefined && { ebd_notes: body.ebd_notes }),
           })
           .eq("id", id)
           .select()

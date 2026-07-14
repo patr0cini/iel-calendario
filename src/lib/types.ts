@@ -99,6 +99,8 @@ export interface ServiceHeader {
   preacher_id: string | null;
   leader_id: string | null;
   notes: string | null;
+  ebd_theme: string | null;
+  ebd_notes: string | null;
   preacher_name: string | null;
   leader_name: string | null;
 }

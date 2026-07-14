@@ -186,7 +186,16 @@ function ServiceView({
           />
         ))}
 
-        {/* EBD per class */}
+        {/* EBD: lesson info + per-class roster (hidden on communion Sundays) */}
+        {ebdMinistry && (
+          <EbdLessonCard
+            key={detail.service.id}
+            service={detail.service}
+            editable={canEditEbd}
+            saving={updateHeader.isPending}
+            onSave={(patch) => updateHeader.mutate(patch)}
+          />
+        )}
         {ebdMinistry && detail.ebd_classes.length > 0 && (
           <RosterEditor
             title="Escola Bíblica Dominical"
@@ -220,6 +229,83 @@ function ServiceView({
         )}
       </div>
     </div>
+  );
+}
+
+// Lesson theme + notes for the Sunday School, editable by EBD or admin.
+function EbdLessonCard({
+  service,
+  editable,
+  saving,
+  onSave,
+}: {
+  service: ServiceDetail["service"];
+  editable: boolean;
+  saving: boolean;
+  onSave: (patch: { ebd_theme: string | null; ebd_notes: string | null }) => void;
+}) {
+  const [theme, setTheme] = useState(service.ebd_theme ?? "");
+  const [notes, setNotes] = useState(service.ebd_notes ?? "");
+  const [dirty, setDirty] = useState(false);
+
+  return (
+    <section className="rounded-lg border border-black/10 p-4 dark:border-white/10">
+      <h3 className="mb-3 flex items-center gap-2 text-sm font-semibold">
+        Escola Bíblica Dominical — lição
+        {!editable && <span className="ml-auto text-xs font-normal text-black/40 dark:text-white/40">🔒</span>}
+      </h3>
+      {editable ? (
+        <div className="space-y-3">
+          <label className="block">
+            <span className="mb-1 block text-xs font-medium text-black/60 dark:text-white/60">Tema da lição</span>
+            <input
+              value={theme}
+              onChange={(e) => {
+                setTheme(e.target.value);
+                setDirty(true);
+              }}
+              className="w-full rounded-md border border-black/15 px-2 py-1.5 text-sm dark:border-white/15 dark:bg-neutral-800"
+            />
+          </label>
+          <label className="block">
+            <span className="mb-1 block text-xs font-medium text-black/60 dark:text-white/60">Notas</span>
+            <textarea
+              value={notes}
+              onChange={(e) => {
+                setNotes(e.target.value);
+                setDirty(true);
+              }}
+              rows={2}
+              className="w-full rounded-md border border-black/15 px-2 py-1.5 text-sm dark:border-white/15 dark:bg-neutral-800"
+            />
+          </label>
+          <div className="flex justify-end">
+            <button
+              type="button"
+              disabled={!dirty || saving}
+              onClick={() => {
+                onSave({ ebd_theme: theme.trim() || null, ebd_notes: notes.trim() || null });
+                setDirty(false);
+              }}
+              className="rounded-md bg-blue-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"
+            >
+              {saving ? "A guardar…" : "Guardar lição"}
+            </button>
+          </div>
+        </div>
+      ) : (
+        <dl className="grid grid-cols-[7rem_1fr] gap-x-3 gap-y-1 text-sm">
+          <dt className="text-black/50 dark:text-white/50">Tema da lição</dt>
+          <dd>{service.ebd_theme || <span className="text-black/30">—</span>}</dd>
+          {service.ebd_notes && (
+            <>
+              <dt className="text-black/50 dark:text-white/50">Notas</dt>
+              <dd>{service.ebd_notes}</dd>
+            </>
+          )}
+        </dl>
+      )}
+    </section>
   );
 }
 
