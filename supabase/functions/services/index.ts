@@ -19,8 +19,9 @@ import { requireScope, assertMinistryWrite } from "../_shared/authz.ts";
 import { enforceRateLimit } from "../_shared/ratelimit.ts";
 import { writeAudit } from "../_shared/audit.ts";
 import { ministryIdBySlug, requireLouvorOrAdmin } from "../_shared/ministries.ts";
+import { buildDetail } from "../_shared/service-detail.ts";
+import { shareSignature } from "../_shared/crypto.ts";
 import { HttpError, errorResponse, jsonResponse, pathSegments, preflight, readJson } from "../_shared/http.ts";
-import type { SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 interface ServiceHeaderInput {
   service_date?: string;
@@ -50,46 +51,7 @@ interface SongInput {
   link?: string | null;
 }
 
-async function buildDetail(db: SupabaseClient, serviceId: string) {
-  const { data: service } = await db.from("services").select("*").eq("id", serviceId).maybeSingle();
-  if (!service) throw new HttpError(404, "service not found");
-
-  const [people, ministries, roles, assignments, songs, ebdClasses, ebdAssignments, unavail] = await Promise.all([
-    db.from("people").select("id, full_name"),
-    db.from("ministries").select("id, slug, name, color, sort_order").order("sort_order"),
-    db.from("ministry_roles").select("*").eq("active", true).order("sort_order"),
-    db.from("service_assignments").select("*").eq("service_id", serviceId).order("sort_order"),
-    db.from("service_songs").select("*").eq("service_id", serviceId).order("position"),
-    db.from("ebd_classes").select("*").eq("active", true).order("sort_order"),
-    db.from("ebd_assignments").select("*").eq("service_id", serviceId).order("sort_order"),
-    db
-      .from("unavailabilities")
-      .select("person_id")
-      .lte("start_date", service.service_date)
-      .gte("end_date", service.service_date),
-  ]);
-
-  const nameById = new Map((people.data ?? []).map((p) => [p.id as string, p.full_name as string]));
-  const withName = <T extends { person_id: string | null }>(row: T) => ({
-    ...row,
-    person_name: row.person_id ? nameById.get(row.person_id) ?? null : null,
-  });
-
-  return {
-    service: {
-      ...service,
-      preacher_name: service.preacher_id ? nameById.get(service.preacher_id) ?? null : null,
-      leader_name: service.leader_id ? nameById.get(service.leader_id) ?? null : null,
-    },
-    ministries: ministries.data ?? [],
-    ministry_roles: roles.data ?? [],
-    assignments: (assignments.data ?? []).map(withName),
-    songs: songs.data ?? [],
-    ebd_classes: ebdClasses.data ?? [],
-    ebd_assignments: (ebdAssignments.data ?? []).map(withName),
-    unavailable_person_ids: [...new Set((unavail.data ?? []).map((u) => u.person_id as string))],
-  };
-}
+// buildDetail moved to _shared/service-detail.ts (also used by /share).
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return preflight(req);
@@ -190,6 +152,27 @@ Deno.serve(async (req) => {
         return jsonResponse(req, 200, data);
       }
       throw new HttpError(405, "method not allowed");
+    }
+
+    // ---- share link: signed public URL for one service ----------------------
+    if (seg.length === 2 && seg[1] === "share-link" && req.method === "GET") {
+      const { data: service } = await db.from("services").select("id").eq("id", id).maybeSingle();
+      if (!service) throw new HttpError(404, "service not found");
+      const ministry = url.searchParams.get("ministry") ?? "all";
+      if (ministry !== "all") await ministryIdBySlug(db, ministry); // validate slug
+      const sig = await shareSignature(id, ministry);
+      // Prefer the host the caller actually used (locally SUPABASE_URL is the
+      // internal Docker address, kong:8000); fall back to SUPABASE_URL.
+      const fwdProto = req.headers.get("x-forwarded-proto") ?? "https";
+      const fwdPort = req.headers.get("x-forwarded-port");
+      let fwdHost = req.headers.get("x-forwarded-host");
+      if (fwdHost && fwdPort && !fwdHost.includes(":") && fwdPort !== "80" && fwdPort !== "443") {
+        fwdHost = `${fwdHost}:${fwdPort}`;
+      }
+      const base = fwdHost ? `${fwdProto}://${fwdHost}` : Deno.env.get("SUPABASE_URL") ?? "";
+      return jsonResponse(req, 200, {
+        url: `${base}/functions/v1/share/${id}?ministry=${encodeURIComponent(ministry)}&sig=${sig}`,
+      });
     }
 
     // ---- sub-resources: assignments / songs / ebd ---------------------------

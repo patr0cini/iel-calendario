@@ -12,6 +12,7 @@ import type { Ministry, ServiceDetail } from "../lib/types";
 import { RosterEditor, type RosterRow } from "./RosterEditor";
 import { SongsEditor } from "./SongsEditor";
 import { ServiceHeaderCard } from "./ServiceHeaderCard";
+import { ShareButton } from "./ShareButton";
 
 function formatDate(date: string): string {
   return formatInTimeZone(new Date(`${date}T12:00:00Z`), TIME_ZONE, "EEEE, d 'de' MMMM 'de' yyyy", { locale: pt });
@@ -94,12 +95,17 @@ function ServiceView({
   // (Partilha da Ceia) appears, and there is no Sunday School.
   const isCeia = isFirstSundayOfMonth(detail.service.service_date);
 
-  const sectionMinistries = (isCeia
-    ? ["presbiterio", "louvor", "multimedia", "assistentes"]
-    : ["louvor", "multimedia", "assistentes"]
-  )
-    .map((slug) => bySlug.get(slug))
-    .filter((m): m is Ministry => Boolean(m));
+  // Data-driven sections: any ministry with defined roles gets a roster block
+  // (so new ministries appear automatically). EBD has its own block; the
+  // Presbitério (Partilha da Ceia) only shows on communion Sundays.
+  const ministriesWithRoles = new Set(detail.ministry_roles.map((r) => r.ministry_id));
+  const sectionMinistries = detail.ministries.filter(
+    (m: Ministry) =>
+      ministriesWithRoles.has(m.id) &&
+      m.slug !== "ebd" &&
+      m.slug !== "culto" &&
+      (m.slug !== "presbiterio" || isCeia),
+  );
   const ebdMinistry = isCeia ? undefined : bySlug.get("ebd");
   const canEditEbd = ebdMinistry ? canEditMinistry(ebdMinistry) : false;
 
@@ -107,13 +113,19 @@ function ServiceView({
     <div className="mx-auto max-w-3xl px-4 py-6 print-area">
       <div className="mb-4 flex items-center justify-between no-print">
         <Link to="/" className="text-sm text-blue-600 hover:underline">← Calendário</Link>
-        <button
-          type="button"
-          onClick={() => window.print()}
-          className="rounded-lg border border-black/15 px-3 py-1.5 text-sm font-medium hover:bg-black/5 dark:border-white/15 dark:hover:bg-white/10"
-        >
-          Imprimir
-        </button>
+        <div className="flex items-center gap-2">
+          <ShareButton
+            serviceId={detail.service.id}
+            ministries={[...sectionMinistries, ...(ebdMinistry ? [ebdMinistry] : [])]}
+          />
+          <button
+            type="button"
+            onClick={() => window.print()}
+            className="rounded-lg border border-black/15 px-3 py-1.5 text-sm font-medium hover:bg-black/5 dark:border-white/15 dark:hover:bg-white/10"
+          >
+            Imprimir
+          </button>
+        </div>
       </div>
 
       <h1 className="text-xl font-bold capitalize sm:text-2xl">{formatDate(detail.service.service_date)}</h1>
