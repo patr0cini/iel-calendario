@@ -269,7 +269,7 @@ export function CalendarPage() {
             plugins={[dayGridPlugin, timeGridPlugin, multiMonthPlugin, listPlugin, interactionPlugin, luxonPlugin]}
             timeZone={TIME_ZONE}
             locale={ptLocale}
-            firstDay={1}
+            firstDay={0}
             initialView="dayGridMonth"
             headerToolbar={{
               left: "prev,next today",

@@ -3,7 +3,8 @@
 Plataforma web para gerir o calendário de atividades e as escalas de serviço de uma igreja
 evangélica em Portugal. Substitui folhas de Excel e grupos de WhatsApp.
 
-- **Interface:** português europeu · **Fuso:** `Europe/Lisbon` · **A semana começa à segunda-feira.**
+- **Interface:** português europeu · **Fuso:** `Europe/Lisbon` · **A semana começa ao domingo**
+  (decisão do Presbitério em 2026-07-15, que substitui a segunda-feira indicada no `PROMPT.md`).
 - **Frontend:** Vite + React 18 + TypeScript + Tailwind, alojado em **GitHub Pages** (estático).
 - **Servidor:** **Supabase** (Postgres + Edge Functions em Deno). Região: **União Europeia**.
 

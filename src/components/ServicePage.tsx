@@ -76,7 +76,10 @@ function ServiceView({
 
   const canEditMinistry = (m: Ministry) =>
     session.scope === "admin" || (session.scope === "ministry" && session.ownMinistryId === m.id);
-  const ownSlug = session.ownMinistryId ? bySlug.get(session.ownMinistryId)?.slug ?? null : null;
+  // Look up by id: `bySlug` is keyed by slug, not by id.
+  const ownSlug = session.ownMinistryId
+    ? detail.ministries.find((m) => m.id === session.ownMinistryId)?.slug ?? null
+    : null;
   const canEditSongs = session.scope === "admin" || (session.scope === "ministry" && ownSlug === "louvor");
 
   // First Sunday of the month = communion service: the Presbitério section
