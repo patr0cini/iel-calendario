@@ -5,6 +5,7 @@ import { CalendarPage } from "./components/CalendarPage";
 import { ServicePage } from "./components/ServicePage";
 import { EscalaPage } from "./components/EscalaPage";
 import { AdminPage } from "./components/admin/AdminPage";
+import { VersionBadge } from "./components/VersionBadge";
 
 const SCOPE_LABEL = { admin: "Presbitério", ministry: "Ministério", readonly: "Leitura" } as const;
 
@@ -76,15 +77,19 @@ function NavBar() {
 
 export default function App() {
   return (
-    <SessionProvider>
-      <NavBar />
-      <Routes>
-        <Route path="/" element={<CalendarPage />} />
-        <Route path="/culto/:data" element={<ServicePage />} />
-        <Route path="/escalas" element={<EscalaPage />} />
-        <Route path="/admin" element={<AdminPage />} />
-        <Route path="*" element={<Navigate to="/" replace />} />
-      </Routes>
-    </SessionProvider>
+    <>
+      <SessionProvider>
+        <NavBar />
+        <Routes>
+          <Route path="/" element={<CalendarPage />} />
+          <Route path="/culto/:data" element={<ServicePage />} />
+          <Route path="/escalas" element={<EscalaPage />} />
+          <Route path="/admin" element={<AdminPage />} />
+          <Route path="*" element={<Navigate to="/" replace />} />
+        </Routes>
+      </SessionProvider>
+      {/* Outside the provider so the version is visible on the sign-in screen too. */}
+      <VersionBadge />
+    </>
   );
 }
