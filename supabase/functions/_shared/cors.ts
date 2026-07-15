@@ -10,7 +10,9 @@ export function corsHeaders(requestOrigin: string | null): Record<string, string
   const allowOrigin = ALLOWED_ORIGIN ?? requestOrigin ?? "";
   return {
     "Access-Control-Allow-Origin": allowOrigin,
-    "Access-Control-Allow-Headers": "authorization, x-access-token, content-type",
+    // Every custom header the app sends must be listed, or the browser blocks
+    // the request at the preflight (x-ms-token = Microsoft sign-in).
+    "Access-Control-Allow-Headers": "authorization, x-access-token, x-ms-token, content-type",
     "Access-Control-Allow-Methods": "GET, POST, PATCH, PUT, DELETE, OPTIONS",
     "Vary": "Origin",
   };
