@@ -174,8 +174,8 @@ function pageHtml(detail: ServiceDetail, ministryFilter: string): string {
   const rosterMinistries = detail.ministries.filter(
     (m) =>
       withRoles.has(m.id as string) &&
+      m.category !== "outro" &&
       m.slug !== "ebd" &&
-      m.slug !== "culto" &&
       (m.slug !== "presbiterio" || isCeia),
   );
 

@@ -88,6 +88,15 @@ export function MinistriesTab() {
                   className={input + " min-w-40 flex-1"}
                 />
                 <code className="text-xs text-black/40">{m.slug}</code>
+                <select
+                  value={m.category}
+                  onChange={(e) => update.mutate({ id: m.id, patch: { category: e.target.value as Ministry["category"] } })}
+                  className={input + " text-xs"}
+                  title="«Outros» são baldes do calendário (Culto, Eventos) ou grupos de pessoas (Convidados): não têm escala."
+                >
+                  <option value="ministerio">Ministério</option>
+                  <option value="outro">Outros</option>
+                </select>
                 <label className="flex items-center gap-1 text-xs">
                   <input type="checkbox" checked={m.active} onChange={(e) => update.mutate({ id: m.id, patch: { active: e.target.checked } })} />
                   ativo

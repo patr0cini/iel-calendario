@@ -17,6 +17,9 @@ on conflict (slug) do nothing;
 -- Membership of these ministries grants platform admin (see identity.ts).
 update ministries set grants_admin = true where slug in ('presbiterio', 'secretariado');
 
+-- Calendar buckets and people pools are not ministries (see the filter groups).
+update ministries set category = 'outro' where slug in ('culto', 'convidados', 'eventos');
+
 -- Ministry roles (editable by the Presbitério later — PROMPT §13).
 -- "Partilha da Ceia" belongs to Presbitério: first Sundays are communion services.
 insert into ministry_roles (ministry_id, name, sort_order)

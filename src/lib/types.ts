@@ -2,6 +2,10 @@ export type Scope = "admin" | "ministry" | "readonly";
 
 export type EventStatus = "proposta" | "confirmada" | "cancelada";
 
+/** Not every row is a ministry: "outro" holds calendar buckets (Culto,
+ *  Eventos) and people pools (Convidados). */
+export type MinistryCategory = "ministerio" | "outro";
+
 export interface Ministry {
   id: string;
   slug: string;
@@ -9,6 +13,7 @@ export interface Ministry {
   color: string;
   sort_order: number;
   active: boolean;
+  category: MinistryCategory;
 }
 
 export interface EventRow {

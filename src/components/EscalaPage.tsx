@@ -25,9 +25,9 @@ export function EscalaPage() {
   const people = usePeople(session.canCreate);
   const { byMinistry: membersByMinistry } = useMemberships(session.canCreate);
 
-  // Presbitério included (its "Partilha da Ceia" is planned here too). "Culto"
-  // is only a calendar bucket for the services — it has no roster.
-  const selectable = session.ministries.filter((m) => m.slug !== "culto");
+  // Only real ministries have rosters: "outro" holds calendar buckets (Culto,
+  // Eventos) and people pools (Convidados).
+  const selectable = session.ministries.filter((m) => m.category !== "outro");
   const ownSlug = session.ownMinistryId ? session.ministries.find((m) => m.id === session.ownMinistryId)?.slug : undefined;
   const slug = params.get("ministerio") ?? ownSlug ?? selectable[0]?.slug ?? "";
   const ministry = session.ministries.find((m) => m.slug === slug);

@@ -115,8 +115,8 @@ function ServiceView({
   const sectionMinistries = detail.ministries.filter(
     (m: Ministry) =>
       ministriesWithRoles.has(m.id) &&
+      m.category !== "outro" &&
       m.slug !== "ebd" &&
-      m.slug !== "culto" &&
       (m.slug !== "presbiterio" || isCeia),
   );
   const ebdMinistry = isCeia ? undefined : bySlug.get("ebd");

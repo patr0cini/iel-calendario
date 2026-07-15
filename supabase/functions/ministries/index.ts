@@ -17,6 +17,8 @@ interface MinistryInput {
   color?: string;
   sort_order?: number;
   active?: boolean;
+  /** "outro" = calendar bucket or people pool, not a ministry with a roster. */
+  category?: "ministerio" | "outro";
 }
 
 interface RoleInput {
@@ -154,6 +156,7 @@ Deno.serve(async (req) => {
           color: body.color,
           sort_order: body.sort_order ?? 0,
           active: body.active ?? true,
+          category: body.category ?? "ministerio",
         })
         .select()
         .single();
@@ -181,6 +184,7 @@ Deno.serve(async (req) => {
           ...(body.color !== undefined && { color: body.color }),
           ...(body.sort_order !== undefined && { sort_order: body.sort_order }),
           ...(body.active !== undefined && { active: body.active }),
+          ...(body.category !== undefined && { category: body.category }),
         })
         .eq("id", id)
         .select()

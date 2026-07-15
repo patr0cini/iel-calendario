@@ -23,7 +23,7 @@ export async function buildDetail(db: SupabaseClient, serviceId: string) {
     leaders,
   ] = await Promise.all([
     db.from("people").select("id, full_name"),
-    db.from("ministries").select("id, slug, name, color, sort_order").order("sort_order"),
+    db.from("ministries").select("id, slug, name, color, sort_order, category").order("sort_order"),
     db.from("ministry_roles").select("*").eq("active", true).order("sort_order"),
     db.from("service_assignments").select("*").eq("service_id", serviceId).order("sort_order"),
     db.from("service_songs").select("*").eq("service_id", serviceId).order("position"),
