@@ -1,6 +1,7 @@
 import { Routes, Route, Navigate, NavLink } from "react-router-dom";
 
 import { SessionProvider, useSession, signOutMicrosoft } from "./session/SessionProvider";
+import { clearSession } from "./lib/session";
 import { CalendarPage } from "./components/CalendarPage";
 import { ServicePage } from "./components/ServicePage";
 import { EscalaPage } from "./components/EscalaPage";
@@ -8,6 +9,16 @@ import { AdminPage } from "./components/admin/AdminPage";
 import { VersionBadge } from "./components/VersionBadge";
 
 const SCOPE_LABEL = { admin: "Presbitério", ministry: "Ministério", readonly: "Leitura" } as const;
+
+/** Drops both doors: the ministry link token and the Microsoft session. */
+async function signOut(withMicrosoft: boolean) {
+  clearSession();
+  if (withMicrosoft) {
+    await signOutMicrosoft(); // redirects away
+    return;
+  }
+  window.location.reload();
+}
 
 function NavBar() {
   const session = useSession();
@@ -60,15 +71,15 @@ function NavBar() {
               {session.personName ?? own?.name ?? SCOPE_LABEL[session.scope]}
             </span>
           </span>
-          {session.signedInWithMicrosoft && (
-            <button
-              type="button"
-              onClick={() => void signOutMicrosoft()}
-              className="shrink-0 text-xs font-medium text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200"
-            >
-              Sair
-            </button>
-          )}
+          {/* Always offered: a link session must be droppable too, otherwise a
+              shared device keeps whoever opened the link signed in forever. */}
+          <button
+            type="button"
+            onClick={() => void signOut(session.signedInWithMicrosoft)}
+            className="shrink-0 text-xs font-medium text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200"
+          >
+            Sair
+          </button>
         </div>
       </div>
     </header>
