@@ -5,6 +5,7 @@
 insert into ministries (slug, name, color, sort_order) values
   ('culto', 'Culto', '#a16207', 0), -- Sunday services take this color/filter in the calendar
   ('presbiterio', 'Presbitério', '#7c3aed', 1),
+  ('secretariado', 'Secretariado', '#0d9488', 2),
   ('louvor', 'Louvor', '#2563eb', 2),
   ('multimedia', 'Multimédia', '#059669', 3),
   ('assistentes', 'Assistentes', '#d97706', 4),
@@ -12,6 +13,9 @@ insert into ministries (slug, name, color, sort_order) values
   ('412', '412 (Adolescentes e Jovens)', '#db2777', 6),
   ('convidados', 'Convidados', '#64748b', 7) -- guest preachers pool
 on conflict (slug) do nothing;
+
+-- Membership of these ministries grants platform admin (see identity.ts).
+update ministries set grants_admin = true where slug in ('presbiterio', 'secretariado');
 
 -- Ministry roles (editable by the Presbitério later — PROMPT §13).
 -- "Partilha da Ceia" belongs to Presbitério: first Sundays are communion services.

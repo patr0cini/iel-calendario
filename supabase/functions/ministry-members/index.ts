@@ -23,7 +23,7 @@ Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return preflight(req);
   try {
     const identity = await requireIdentity(req);
-    enforceRateLimit(identity.tokenId);
+    enforceRateLimit(identity.rateKey);
     const db = serviceClient();
     const id = pathSegments(req, "ministry-members")[0];
     const url = new URL(req.url);
@@ -34,8 +34,8 @@ Deno.serve(async (req) => {
       const person = url.searchParams.get("person");
       if (person) q = q.eq("person_id", person);
       // A ministry token only sees its own ministry's memberships.
-      if (identity.scope === "ministry" && identity.ministryId) {
-        q = q.eq("ministry_id", identity.ministryId);
+      if (identity.scope === "ministry" && identity.ministryIds.length > 0) {
+        q = q.in("ministry_id", identity.ministryIds);
       } else {
         const ministry = url.searchParams.get("ministry");
         if (ministry) q = q.eq("ministry_id", ministry);

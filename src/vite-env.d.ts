@@ -3,6 +3,8 @@
 interface ImportMetaEnv {
   readonly VITE_BASE_PATH: string;
   readonly VITE_FUNCTIONS_URL: string;
+  readonly VITE_MS_CLIENT_ID: string;
+  readonly VITE_MS_TENANT_ID: string;
 }
 
 interface ImportMeta {

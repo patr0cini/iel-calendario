@@ -24,9 +24,13 @@ export interface EventRow {
 }
 
 export interface AuthResolve {
+  /** Primary ministry (all a link token ever has). */
   ministry: Pick<Ministry, "id" | "slug" | "name" | "color"> | null;
+  /** Every ministry of this identity (a Microsoft sign-in may have several). */
+  ministries: Pick<Ministry, "id" | "slug" | "name" | "color">[];
   scope: Scope;
   permissions: string[];
+  person: { id: string; full_name: string | null } | null;
 }
 
 export interface EventInput {

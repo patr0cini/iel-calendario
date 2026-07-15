@@ -1,6 +1,6 @@
 import { Routes, Route, Navigate, NavLink } from "react-router-dom";
 
-import { SessionProvider, useSession } from "./session/SessionProvider";
+import { SessionProvider, useSession, signOutMicrosoft } from "./session/SessionProvider";
 import { CalendarPage } from "./components/CalendarPage";
 import { ServicePage } from "./components/ServicePage";
 import { EscalaPage } from "./components/EscalaPage";
@@ -45,19 +45,30 @@ function NavBar() {
           )}
         </nav>
 
-        <span
-          className="ml-auto inline-flex min-w-0 items-center gap-1.5 rounded-full border border-zinc-900/10 px-2.5 py-1 text-xs font-medium text-zinc-600 dark:border-white/15 dark:text-zinc-300"
-          title={own ? own.name : undefined}
-        >
+        <div className="ml-auto flex min-w-0 items-center gap-2">
           <span
-            className="h-1.5 w-1.5 shrink-0 rounded-full"
-            style={{ backgroundColor: own?.color ?? "#6366f1" }}
-            aria-hidden
-          />
-          <span className="max-w-[7.5rem] truncate sm:max-w-none">
-            {own ? own.name : SCOPE_LABEL[session.scope]}
+            className="inline-flex min-w-0 items-center gap-1.5 rounded-full border border-zinc-900/10 px-2.5 py-1 text-xs font-medium text-zinc-600 dark:border-white/15 dark:text-zinc-300"
+            title={session.personName ?? own?.name ?? undefined}
+          >
+            <span
+              className="h-1.5 w-1.5 shrink-0 rounded-full"
+              style={{ backgroundColor: own?.color ?? "#6366f1" }}
+              aria-hidden
+            />
+            <span className="max-w-[7.5rem] truncate sm:max-w-none">
+              {session.personName ?? own?.name ?? SCOPE_LABEL[session.scope]}
+            </span>
           </span>
-        </span>
+          {session.signedInWithMicrosoft && (
+            <button
+              type="button"
+              onClick={() => void signOutMicrosoft()}
+              className="shrink-0 text-xs font-medium text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200"
+            >
+              Sair
+            </button>
+          )}
+        </div>
       </div>
     </header>
   );

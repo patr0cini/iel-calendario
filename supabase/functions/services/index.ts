@@ -65,7 +65,7 @@ Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return preflight(req);
   try {
     const identity = await requireIdentity(req);
-    enforceRateLimit(identity.tokenId);
+    enforceRateLimit(identity.rateKey);
     const db = serviceClient();
     const seg = pathSegments(req, "services");
     const url = new URL(req.url);

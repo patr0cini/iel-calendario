@@ -5,6 +5,7 @@
 // for domain data. Every request carries the access token in `x-access-token`.
 
 import { getToken } from "./session";
+import { getMicrosoftToken, hasMicrosoftAccount } from "./msal";
 
 const FUNCTIONS_URL = import.meta.env.VITE_FUNCTIONS_URL;
 
@@ -35,6 +36,11 @@ export async function apiFetch<T>(
   };
 
   if (auth) {
+    // A Microsoft sign-in wins over a ministry link when both are present.
+    if (hasMicrosoftAccount()) {
+      const msToken = await getMicrosoftToken();
+      if (msToken) headers["x-ms-token"] = msToken;
+    }
     const token = getToken();
     if (token) headers["x-access-token"] = token;
   }

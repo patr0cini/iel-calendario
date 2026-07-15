@@ -86,7 +86,7 @@ Deno.serve(async (req) => {
   try {
     if (req.method !== "GET") throw new HttpError(405, "method not allowed");
     const identity = await requireIdentity(req); // reads ?token=
-    enforceRateLimit(identity.tokenId);
+    enforceRateLimit(identity.rateKey);
     const db = serviceClient();
     const url = new URL(req.url);
     const ministryParam = url.searchParams.get("ministry") ?? "all";

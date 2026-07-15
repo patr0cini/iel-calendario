@@ -20,12 +20,12 @@ interface UnavailabilityInput {
 
 async function assertPersonWritable(db: SupabaseClient, identity: Identity, personId: string) {
   if (identity.scope === "admin") return;
-  if (identity.scope === "ministry" && identity.ministryId) {
+  if (identity.scope === "ministry" && identity.ministryIds.length > 0) {
     const { data } = await db
       .from("ministry_members")
       .select("id")
       .eq("person_id", personId)
-      .eq("ministry_id", identity.ministryId)
+      .in("ministry_id", identity.ministryIds)
       .limit(1);
     if (Array.isArray(data) && data.length > 0) return;
   }
@@ -36,7 +36,7 @@ Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return preflight(req);
   try {
     const identity = await requireIdentity(req);
-    enforceRateLimit(identity.tokenId);
+    enforceRateLimit(identity.rateKey);
     requireScope(identity, "admin", "ministry");
     const db = serviceClient();
     const id = pathSegments(req, "unavailabilities")[0];

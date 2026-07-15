@@ -24,16 +24,17 @@ interface PersonInput {
   notes?: string | null;
 }
 
-async function personInMinistry(
+async function personInAnyMinistry(
   db: SupabaseClient,
   personId: string,
-  ministryId: string,
+  ministryIds: string[],
 ): Promise<boolean> {
+  if (ministryIds.length === 0) return false;
   const { data } = await db
     .from("ministry_members")
     .select("id")
     .eq("person_id", personId)
-    .eq("ministry_id", ministryId)
+    .in("ministry_id", ministryIds)
     .limit(1);
   return Array.isArray(data) && data.length > 0;
 }
@@ -45,11 +46,7 @@ async function assertPersonWritable(
   personId: string,
 ): Promise<void> {
   if (identity.scope === "admin") return;
-  if (
-    identity.scope === "ministry" &&
-    identity.ministryId &&
-    (await personInMinistry(db, personId, identity.ministryId))
-  ) {
+  if (identity.scope === "ministry" && (await personInAnyMinistry(db, personId, identity.ministryIds))) {
     return;
   }
   throw new HttpError(403, "cannot modify a person outside your ministry");
@@ -59,7 +56,7 @@ Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return preflight(req);
   try {
     const identity = await requireIdentity(req);
-    enforceRateLimit(identity.tokenId);
+    enforceRateLimit(identity.rateKey);
     const db = serviceClient();
     const id = pathSegments(req, "people")[0];
 

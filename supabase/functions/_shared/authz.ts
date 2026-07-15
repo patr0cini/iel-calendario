@@ -12,12 +12,13 @@ export function requireScope(identity: Identity, ...allowed: Scope[]): void {
 }
 
 /**
- * Ministry-scoped write: admin may write to any ministry; a `ministry` token may
- * write only to its own ministry; `readonly` may never write.
+ * Ministry-scoped write: admin may write to any ministry; a `ministry` identity
+ * may write only to ministries it belongs to (a link token carries exactly one;
+ * a Microsoft sign-in may carry several); `readonly` may never write.
  */
 export function assertMinistryWrite(identity: Identity, ministryId: string): void {
   if (identity.scope === "admin") return;
-  if (identity.scope === "ministry" && identity.ministryId === ministryId) return;
+  if (identity.scope === "ministry" && identity.ministryIds.includes(ministryId)) return;
   throw new HttpError(403, "cannot write to another ministry");
 }
 
