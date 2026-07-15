@@ -96,20 +96,76 @@ function ebdHtml(detail: ServiceDetail): string {
   return `<section><h2>Escola Bíblica Dominical</h2>${lessonHtml}${rows ? `<table>${rows}</table>` : ""}</section>`;
 }
 
+// The liturgy outline, matching the app: Boas vindas · Louvor · Leitura e
+// oração · Pregação [· Ceia] · Louvor · Oferta · Anúncios · Despedida.
+function liturgyHtml(detail: ServiceDetail, isCeia: boolean): string {
+  const momentOf = (key: string) => detail.moments.find((m) => m.moment === key);
+  const songNames = (moments: string[]) =>
+    detail.songs.filter((s) => moments.includes(s.moment as string)).map((s) => esc(s.title));
+
+  const step = (title: string, detailHtml: string) =>
+    `<li><span class="st">${esc(title)}</span>${detailHtml ? `<div class="sd">${detailHtml}</div>` : ""}</li>`;
+
+  const momentStep = (key: string, label: string) => {
+    const m = momentOf(key);
+    const bits = [
+      m?.person_name ? esc(m.person_name) : '<span class="empty">—</span>',
+      m?.scripture ? `· ${esc(m.scripture)}` : "",
+    ]
+      .filter(Boolean)
+      .join(" ");
+    const notes = m?.notes ? `<div class="note">${esc(m.notes)}</div>` : "";
+    return step(label, bits + notes);
+  };
+
+  const songsStep = (moments: string[]) => {
+    const names = songNames(moments);
+    return step(
+      "Louvor e adoração",
+      names.length ? `<ol class="songs">${names.map((n) => `<li>${n}</li>`).join("")}</ol>` : '<span class="empty">— sem músicas —</span>',
+    );
+  };
+
+  const s = detail.service;
+  const sermon = [
+    s.preacher_name && `<tr><td class="k">Pregador</td><td>${esc(s.preacher_name)}</td></tr>`,
+    s.theme && `<tr><td class="k">Tema</td><td>${esc(s.theme)}</td></tr>`,
+    s.scripture && `<tr><td class="k">Texto</td><td>${esc(s.scripture)}</td></tr>`,
+    s.scripture_aux && `<tr><td class="k">Textos aux.</td><td>${esc(s.scripture_aux)}</td></tr>`,
+  ]
+    .filter(Boolean)
+    .join("");
+
+  const communionPeople = (() => {
+    const presb = detail.ministries.find((m) => m.slug === "presbiterio");
+    return detail.assignments
+      .filter((a) => a.ministry_id === presb?.id && a.person_name)
+      .map((a) => esc(a.person_name))
+      .join(", ");
+  })();
+
+  const steps = [
+    momentStep("boas_vindas", "Boas vindas"),
+    songsStep(["abertura", "adoracao"]),
+    momentStep("leitura_oracao", "Leitura e oração"),
+    step("Pregação", sermon ? `<table>${sermon}</table>` : '<span class="empty">—</span>'),
+    ...(isCeia ? [step("Ceia", communionPeople || '<span class="empty">—</span>')] : []),
+    songsStep(["final", "outro"]),
+    momentStep("oferta", "Oferta"),
+    momentStep("anuncios", "Anúncios"),
+    momentStep("despedida", "Despedida"),
+  ].join("");
+
+  return `<section><h2>Ordem do culto</h2><ol class="liturgy">${steps}</ol></section>`;
+}
+
 function pageHtml(detail: ServiceDetail, ministryFilter: string): string {
   const s = detail.service;
   const isCeia = isFirstSundayOfMonth(s.service_date as string);
   const bySlug = new Map(detail.ministries.map((m) => [m.slug as string, m]));
   const only = ministryFilter === "all" ? null : bySlug.get(ministryFilter) ?? null;
 
-  const headerRows = [
-    s.theme && `<tr><td class="k">Tema</td><td>${esc(s.theme)}</td></tr>`,
-    s.scripture && `<tr><td class="k">Texto</td><td>${esc(s.scripture)}</td></tr>`,
-    s.preacher_name && `<tr><td class="k">Pregador</td><td>${esc(s.preacher_name)}</td></tr>`,
-    s.notes && `<tr><td class="k">Notas</td><td>${esc(s.notes)}</td></tr>`,
-  ]
-    .filter(Boolean)
-    .join("");
+  const headerRows = ""; // the liturgy below carries the sermon detail
 
   const sections: string[] = [];
   // Data-driven: any ministry with roles gets a block; EBD is its own block and
@@ -122,6 +178,9 @@ function pageHtml(detail: ServiceDetail, ministryFilter: string): string {
       m.slug !== "culto" &&
       (m.slug !== "presbiterio" || isCeia),
   );
+
+  // Full share leads with the liturgy; scoped shares go straight to the ministry.
+  if (!only) sections.push(liturgyHtml(detail, isCeia));
 
   if (only) {
     if (only.slug === "louvor") sections.push(songsHtml(detail));
@@ -161,6 +220,10 @@ function pageHtml(detail: ServiceDetail, ministryFilter: string): string {
   td { padding: 3px 0; vertical-align: top; }
   td.k { color: #777; width: 8.5rem; padding-right: 10px; }
   ol { padding-left: 1.2rem; font-size: .9rem; } li { margin: 3px 0; }
+  ol.liturgy { padding-left: 1.4rem; } ol.liturgy > li { margin: 10px 0; }
+  .st { font-weight: 600; } .sd { margin-top: 2px; color: #555; }
+  .sd table { margin-top: 2px; } ol.songs { margin: 2px 0 0; padding-left: 1rem; }
+  .note { margin-top: 2px; font-size: .85em; color: #777; }
   .muted { color: #888; } .empty { color: #bbb; }
   .tag { font-size: .7rem; background: #eee; border-radius: 999px; padding: 1px 8px; color: #555; }
   footer { text-align: center; color: #999; font-size: .75rem; margin-top: 20px; }
@@ -168,6 +231,7 @@ function pageHtml(detail: ServiceDetail, ministryFilter: string): string {
     body { background: #161616; color: #ececec; }
     section { background: #1f1f1f; border-color: #333; }
     td.k { color: #9a9a9a; } .sub { color: #9a9a9a; }
+    .sd { color: #b5b5b5; } .note { color: #8f8f8f; }
     .tag { background: #333; color: #bbb; } .empty { color: #555; }
     .badge { background: #453006; color: #fcd34d; }
   }

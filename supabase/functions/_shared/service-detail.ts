@@ -9,7 +9,19 @@ export async function buildDetail(db: SupabaseClient, serviceId: string) {
   const { data: service } = await db.from("services").select("*").eq("id", serviceId).maybeSingle();
   if (!service) throw new HttpError(404, "service not found");
 
-  const [people, ministries, roles, assignments, songs, ebdClasses, ebdAssignments, unavail] = await Promise.all([
+  const [
+    people,
+    ministries,
+    roles,
+    assignments,
+    songs,
+    ebdClasses,
+    ebdAssignments,
+    unavail,
+    moments,
+    notes,
+    leaders,
+  ] = await Promise.all([
     db.from("people").select("id, full_name"),
     db.from("ministries").select("id, slug, name, color, sort_order").order("sort_order"),
     db.from("ministry_roles").select("*").eq("active", true).order("sort_order"),
@@ -22,6 +34,10 @@ export async function buildDetail(db: SupabaseClient, serviceId: string) {
       .select("person_id")
       .lte("start_date", service.service_date)
       .gte("end_date", service.service_date),
+    db.from("service_moments").select("*").eq("service_id", serviceId),
+    // This service's notes plus the recurring ones (service_id is null).
+    db.from("ministry_notes").select("*").or(`service_id.eq.${serviceId},service_id.is.null`).order("created_at"),
+    db.from("ministry_members").select("ministry_id, person_id").eq("is_leader", true),
   ]);
 
   const nameById = new Map((people.data ?? []).map((p) => [p.id as string, p.full_name as string]));
@@ -43,6 +59,13 @@ export async function buildDetail(db: SupabaseClient, serviceId: string) {
     ebd_classes: ebdClasses.data ?? [],
     ebd_assignments: (ebdAssignments.data ?? []).map(withName),
     unavailable_person_ids: [...new Set((unavail.data ?? []).map((u) => u.person_id as string))],
+    moments: (moments.data ?? []).map(withName),
+    ministry_notes: notes.data ?? [],
+    leaders: (leaders.data ?? []).map((l) => ({
+      ministry_id: l.ministry_id as string,
+      person_id: l.person_id as string,
+      person_name: nameById.get(l.person_id as string) ?? null,
+    })),
   };
 }
 

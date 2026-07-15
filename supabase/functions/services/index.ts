@@ -32,8 +32,16 @@ interface ServiceHeaderInput {
   preacher_id?: string | null;
   leader_id?: string | null;
   notes?: string | null;
+  scripture_aux?: string | null;
   ebd_theme?: string | null;
   ebd_notes?: string | null;
+}
+
+interface MomentInput {
+  moment?: string;
+  person_id?: string | null;
+  scripture?: string | null;
+  notes?: string | null;
 }
 
 interface AssignmentInput {
@@ -153,6 +161,7 @@ Deno.serve(async (req) => {
             ...(body.preacher_id !== undefined && { preacher_id: body.preacher_id }),
             ...(body.leader_id !== undefined && { leader_id: body.leader_id }),
             ...(body.notes !== undefined && { notes: body.notes }),
+            ...(body.scripture_aux !== undefined && { scripture_aux: body.scripture_aux }),
             ...(body.ebd_theme !== undefined && { ebd_theme: body.ebd_theme }),
             ...(body.ebd_notes !== undefined && { ebd_notes: body.ebd_notes }),
           })
@@ -212,6 +221,32 @@ Deno.serve(async (req) => {
           if (error) throw new HttpError(400, error.message);
         }
         await writeAudit(db, identity, { action: "update", entity: "service_assignments", entityId: id, after: body.assignments, ministryId });
+        return jsonResponse(req, 200, await buildDetail(db, id));
+      }
+
+      // PUT /services/{id}/moments — one liturgy moment (admin).
+      // The liturgy frames the whole service, so it stays with the Presbitério.
+      if (sub === "moments") {
+        requireScope(identity, "admin");
+        const body = await readJson<MomentInput>(req);
+        if (!body.moment) throw new HttpError(400, "moment is required");
+        const { error } = await db.from("service_moments").upsert(
+          {
+            service_id: id,
+            moment: body.moment,
+            person_id: body.person_id ?? null,
+            scripture: body.scripture ?? null,
+            notes: body.notes ?? null,
+          },
+          { onConflict: "service_id,moment" },
+        );
+        if (error) throw new HttpError(400, error.message);
+        await writeAudit(db, identity, {
+          action: "update",
+          entity: "service_moments",
+          entityId: id,
+          after: body,
+        });
         return jsonResponse(req, 200, await buildDetail(db, id));
       }
 

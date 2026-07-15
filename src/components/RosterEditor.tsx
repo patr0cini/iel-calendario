@@ -17,6 +17,8 @@ interface RosterEditorProps {
   people: PersonLite[];
   /** Members of this ministry: suggested first in the search field. */
   memberIds?: Set<string>;
+  /** Render without the card chrome (already inside a section). */
+  bare?: boolean;
   editable: boolean;
   unavailableIds: Set<string>;
   saving?: boolean;
@@ -25,7 +27,7 @@ interface RosterEditorProps {
 
 // Each role holds any number of people, shown as chips; a search field adds
 // more (type a name, matches appear below, ministry members first).
-export function RosterEditor({ title, color, rows, people, memberIds, editable, unavailableIds, saving, onSave }: RosterEditorProps) {
+export function RosterEditor({ title, color, rows, people, memberIds, bare, editable, unavailableIds, saving, onSave }: RosterEditorProps) {
   const [selection, setSelection] = useState<Record<string, string[]>>(
     () => Object.fromEntries(rows.map((r) => [r.key, r.people.map((p) => p.id)])),
   );
@@ -50,13 +52,21 @@ export function RosterEditor({ title, color, rows, people, memberIds, editable, 
   const nameOf = (row: RosterRow, id: string) =>
     people.find((p) => p.id === id)?.full_name ?? row.people.find((p) => p.id === id)?.name ?? "—";
 
+  const Wrapper = bare ? "div" : "section";
+
   return (
-    <section className="card p-4 sm:p-5">
-      <h3 className="mb-3 flex items-center gap-2 text-sm font-semibold">
-        <span className="inline-block h-3 w-3 rounded-sm" style={{ backgroundColor: color }} aria-hidden />
-        {title}
-        {!editable && <span className="ml-auto text-xs font-normal text-black/40 dark:text-white/40">🔒 bloqueado</span>}
-      </h3>
+    <Wrapper className={bare ? "" : "card p-4 sm:p-5"}>
+      {bare ? (
+        <h4 className="mb-2 text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">
+          {title}
+        </h4>
+      ) : (
+        <h3 className="mb-3 flex items-center gap-2 text-sm font-semibold">
+          <span className="inline-block h-3 w-3 rounded-sm" style={{ backgroundColor: color }} aria-hidden />
+          {title}
+          {!editable && <span className="ml-auto text-xs font-normal text-black/40 dark:text-white/40">🔒 bloqueado</span>}
+        </h3>
+      )}
 
       <ul className="space-y-2">
         {rows.length === 0 && <li className="text-sm text-black/50">Sem funções definidas.</li>}
@@ -113,6 +123,6 @@ export function RosterEditor({ title, color, rows, people, memberIds, editable, 
           </button>
         </div>
       )}
-    </section>
+    </Wrapper>
   );
 }

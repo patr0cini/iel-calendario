@@ -34,6 +34,60 @@ Deno.serve(async (req) => {
     const seg = pathSegments(req, "ministries");
     const id = seg[0];
 
+    // /ministries/{id}/leaders — a ministry may have several leaders.
+    // Stored as `is_leader` on ministry_members (a leader is always a member).
+    if (seg.length === 2 && seg[1] === "leaders") {
+      if (req.method === "GET") {
+        const { data, error } = await db
+          .from("ministry_members")
+          .select("person_id, people(full_name)")
+          .eq("ministry_id", id)
+          .eq("is_leader", true);
+        if (error) throw new HttpError(500, error.message);
+        return jsonResponse(
+          req,
+          200,
+          (data ?? []).map((r) => {
+            const { people, ...rest } = r as Record<string, unknown> & { people: { full_name: string } | null };
+            return { ...rest, full_name: people?.full_name ?? null };
+          }),
+        );
+      }
+      if (req.method === "PUT") {
+        requireScope(identity, "admin");
+        const body = await readJson<{ person_ids: string[] }>(req);
+        if (!Array.isArray(body.person_ids)) throw new HttpError(400, "person_ids array is required");
+        const { data: ministry } = await db.from("ministries").select("id").eq("id", id).maybeSingle();
+        if (!ministry) throw new HttpError(404, "ministry not found");
+        // Leaders must be members: add any that are missing.
+        if (body.person_ids.length > 0) {
+          const rows = body.person_ids.map((person_id) => ({ ministry_id: id, person_id }));
+          const { error } = await db
+            .from("ministry_members")
+            .upsert(rows, { onConflict: "ministry_id,person_id", ignoreDuplicates: true });
+          if (error) throw new HttpError(400, error.message);
+        }
+        await db.from("ministry_members").update({ is_leader: false }).eq("ministry_id", id);
+        if (body.person_ids.length > 0) {
+          const { error } = await db
+            .from("ministry_members")
+            .update({ is_leader: true })
+            .eq("ministry_id", id)
+            .in("person_id", body.person_ids);
+          if (error) throw new HttpError(400, error.message);
+        }
+        await writeAudit(db, identity, {
+          action: "update",
+          entity: "ministry_leaders",
+          entityId: id,
+          after: body.person_ids,
+          ministryId: id,
+        });
+        return jsonResponse(req, 200, { ministry_id: id, person_ids: body.person_ids });
+      }
+      throw new HttpError(405, "method not allowed");
+    }
+
     // /ministries/{id}/roles — the editable set of functions per ministry
     // (PROMPT §13: the Presbitério manages these; never a hardcoded enum).
     if (seg.length === 2 && seg[1] === "roles") {

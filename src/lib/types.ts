@@ -96,6 +96,7 @@ export interface ServiceHeader {
   label: string | null;
   theme: string | null;
   scripture: string | null;
+  scripture_aux: string | null;
   preacher_id: string | null;
   leader_id: string | null;
   notes: string | null;
@@ -103,6 +104,33 @@ export interface ServiceHeader {
   ebd_notes: string | null;
   preacher_name: string | null;
   leader_name: string | null;
+}
+
+export type MomentKey = "boas_vindas" | "leitura_oracao" | "oferta" | "anuncios" | "despedida";
+
+export interface ServiceMoment {
+  id: string;
+  service_id: string;
+  moment: MomentKey;
+  person_id: string | null;
+  person_name: string | null;
+  scripture: string | null;
+  notes: string | null;
+}
+
+export interface MinistryNote {
+  id: string;
+  ministry_id: string;
+  /** null = recurring note ("repetir sempre"). */
+  service_id: string | null;
+  body: string;
+  created_at: string;
+}
+
+export interface MinistryLeader {
+  ministry_id: string;
+  person_id: string;
+  person_name: string | null;
 }
 
 export interface ServiceDetail {
@@ -114,6 +142,9 @@ export interface ServiceDetail {
   ebd_classes: EbdClass[];
   ebd_assignments: EbdAssignment[];
   unavailable_person_ids: string[];
+  moments: ServiceMoment[];
+  ministry_notes: MinistryNote[];
+  leaders: MinistryLeader[];
 }
 
 export interface PersonLite {

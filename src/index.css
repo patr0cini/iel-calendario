@@ -196,6 +196,10 @@ body,
   .no-print {
     display: none !important;
   }
+  /* Collapsed ministry sections still print (CollapsibleSection). */
+  .print-open {
+    display: block !important;
+  }
   .print-area {
     max-width: none !important;
     padding: 0 !important;

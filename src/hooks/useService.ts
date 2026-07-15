@@ -1,7 +1,15 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { apiFetch, ApiError } from "../lib/api";
-import type { AssignmentInput, ServiceDetail, ServiceHeader, SongInput } from "../lib/types";
+import type {
+  AssignmentInput,
+  MinistryNote,
+  MomentKey,
+  ServiceDetail,
+  ServiceHeader,
+  ServiceMoment,
+  SongInput,
+} from "../lib/types";
 
 export function useServiceDetail(date: string) {
   const query = useQuery({
@@ -48,7 +56,25 @@ export function useServiceMutations(serviceId: string | undefined, date: string)
     onSuccess: (data) => qc.setQueryData(["service", date], data),
   });
 
-  return { updateHeader, saveAssignments, saveSongs, saveEbd };
+  const saveMoment = useMutation({
+    mutationFn: (v: { moment: MomentKey } & Partial<ServiceMoment>) =>
+      apiFetch<ServiceDetail>(`/services/${serviceId}/moments`, { method: "PUT", body: v }),
+    onSuccess: (data) => qc.setQueryData(["service", date], data),
+  });
+
+  const addNote = useMutation({
+    mutationFn: (v: { ministry_id: string; service_id: string | null; body: string }) =>
+      apiFetch<MinistryNote>("/ministry-notes", { method: "POST", body: v }),
+    // A recurring note lands on every service, so refresh them all.
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["service"] }),
+  });
+
+  const removeNote = useMutation({
+    mutationFn: (id: string) => apiFetch<void>(`/ministry-notes/${id}`, { method: "DELETE" }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["service"] }),
+  });
+
+  return { updateHeader, saveAssignments, saveSongs, saveEbd, saveMoment, addNote, removeNote };
 }
 
 // Admin-only: create a missing service, or generate a whole year of Sundays.

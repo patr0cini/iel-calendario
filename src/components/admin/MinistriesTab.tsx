@@ -2,6 +2,8 @@ import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { apiFetch } from "../../lib/api";
+import { usePeople } from "../../hooks/usePeople";
+import { PersonPicker, PersonChip } from "../PersonPicker";
 import type { Ministry, MinistryRole } from "../../lib/types";
 import { Section, ErrorNote, input, btnPrimary, btnDanger, btnGhost } from "./shared";
 
@@ -91,18 +93,85 @@ export function MinistriesTab() {
                   ativo
                 </label>
                 <button type="button" className={btnGhost} onClick={() => setExpanded(expanded === m.id ? null : m.id)}>
-                  Funções {expanded === m.id ? "▲" : "▼"}
+                  Líderes e funções {expanded === m.id ? "▲" : "▼"}
                 </button>
                 <button type="button" className={btnDanger} onClick={() => remove.mutate(m.id)}>
                   Apagar
                 </button>
               </div>
-              {expanded === m.id && <RolesEditor ministry={m} />}
+              {expanded === m.id && (
+                <>
+                  <LeadersEditor ministry={m} />
+                  <RolesEditor ministry={m} />
+                </>
+              )}
             </li>
           ))}
         </ul>
         <ErrorNote error={update.error ?? remove.error} />
       </Section>
+    </div>
+  );
+}
+
+interface LeaderRow {
+  person_id: string;
+  full_name: string | null;
+}
+
+// A ministry may have several leaders. Stored as `is_leader` on
+// ministry_members, so a leader is always a member too.
+function LeadersEditor({ ministry }: { ministry: Ministry }) {
+  const qc = useQueryClient();
+  const people = usePeople(true);
+
+  const leaders = useQuery({
+    queryKey: ["ministry-leaders", ministry.id],
+    queryFn: () => apiFetch<LeaderRow[]>(`/ministries/${ministry.id}/leaders`),
+  });
+
+  const save = useMutation({
+    mutationFn: (person_ids: string[]) =>
+      apiFetch<unknown>(`/ministries/${ministry.id}/leaders`, { method: "PUT", body: { person_ids } }),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ["ministry-leaders", ministry.id] });
+      void qc.invalidateQueries({ queryKey: ["memberships"] });
+      // Service pages show the leaders in each ministry header.
+      void qc.invalidateQueries({ queryKey: ["service"] });
+    },
+  });
+
+  const current = leaders.data ?? [];
+  const ids = current.map((l) => l.person_id);
+
+  return (
+    <div className="mt-2 rounded-md bg-black/[0.03] p-3 dark:bg-white/[0.05]">
+      <h4 className="mb-2 text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">
+        Líderes
+      </h4>
+      {leaders.isLoading ? (
+        <p className="text-sm text-zinc-500">A carregar…</p>
+      ) : (
+        <>
+          <div className="mb-2 flex flex-wrap gap-1.5">
+            {current.length === 0 && <span className="text-sm text-zinc-400">Sem líderes.</span>}
+            {current.map((l) => (
+              <PersonChip
+                key={l.person_id}
+                name={l.full_name ?? "?"}
+                onRemove={() => save.mutate(ids.filter((id) => id !== l.person_id))}
+              />
+            ))}
+          </div>
+          <PersonPicker
+            people={people.data ?? []}
+            exclude={new Set(ids)}
+            placeholder="Escrever nome para adicionar líder…"
+            onPick={(p) => save.mutate([...ids, p.id])}
+          />
+          <ErrorNote error={save.error} />
+        </>
+      )}
     </div>
   );
 }

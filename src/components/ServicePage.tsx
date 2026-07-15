@@ -11,9 +11,11 @@ import { TIME_ZONE, isFirstSundayOfMonth } from "../lib/datetime";
 import type { Ministry, ServiceDetail } from "../lib/types";
 import { RosterEditor, type RosterRow } from "./RosterEditor";
 import { SongsEditor } from "./SongsEditor";
-import { ServiceHeaderCard } from "./ServiceHeaderCard";
 import { normalizeText } from "./PersonPicker";
 import { ShareButton } from "./ShareButton";
+import { LiturgyOrder } from "./LiturgyOrder";
+import { CollapsibleSection } from "./CollapsibleSection";
+import { MinistryNotes } from "./MinistryNotes";
 
 function formatDate(date: string): string {
   return formatInTimeZone(new Date(`${date}T12:00:00Z`), TIME_ZONE, "EEEE, d 'de' MMMM 'de' yyyy", { locale: pt });
@@ -67,9 +69,14 @@ function ServiceView({
   peopleData: { id: string; full_name: string }[];
   session: ReturnType<typeof useSession>;
 }) {
-  const { updateHeader, saveAssignments, saveSongs, saveEbd } = useServiceMutations(detail.service.id, dateParam);
+  const { updateHeader, saveAssignments, saveSongs, saveEbd, saveMoment, addNote, removeNote } =
+    useServiceMutations(detail.service.id, dateParam);
   const [savingKey, setSavingKey] = useState<string | null>(null);
   const { byMinistry: membersByMinistry } = useMemberships(session.canCreate);
+
+  const notesOf = (ministryId: string) => detail.ministry_notes.filter((n) => n.ministry_id === ministryId);
+  const leadersOf = (ministryId: string) =>
+    detail.leaders.filter((l) => l.ministry_id === ministryId).map((l) => l.person_name ?? "?");
 
   const unavailable = useMemo(() => new Set(detail.unavailable_person_ids), [detail.unavailable_person_ids]);
   const bySlug = useMemo(() => new Map(detail.ministries.map((m) => [m.slug, m])), [detail.ministries]);
@@ -153,17 +160,20 @@ function ServiceView({
         </div>
       </div>
 
-      <ServiceHeaderCard
+      <LiturgyOrder
         key={detail.service.id}
-        service={detail.service}
+        detail={detail}
+        isCeia={isCeia}
+        people={peopleData}
         preacherOptions={preacherOptions}
         editable={session.scope === "admin"}
-        saving={updateHeader.isPending}
-        onSave={(patch) => updateHeader.mutate(patch)}
+        saving={updateHeader.isPending || saveMoment.isPending}
+        onSaveHeader={(patch) => updateHeader.mutate(patch)}
+        onSaveMoment={(moment, patch) => saveMoment.mutate({ moment, ...patch })}
       />
 
       {(conflicts.length > 0) && (
-        <div className="my-4 rounded-lg border border-amber-400 bg-amber-50 p-3 text-sm text-amber-800 dark:border-amber-700 dark:bg-amber-950/40 dark:text-amber-200">
+        <div className="my-4 rounded-xl border border-amber-400 bg-amber-50 p-3 text-sm text-amber-800 dark:border-amber-700 dark:bg-amber-950/40 dark:text-amber-200">
           <p className="mb-1 font-semibold">⚠️ Avisos</p>
           <ul className="list-inside list-disc space-y-0.5">
             {conflicts.map((c, i) => <li key={i}>{c}</li>)}
@@ -171,93 +181,142 @@ function ServiceView({
         </div>
       )}
 
-      <div className="mt-4 space-y-4">
-        {/* Louvor: songs + roster */}
-        {bySlug.get("louvor") && (
-          <section className="card p-4 sm:p-5">
-            <h3 className="mb-3 flex items-center gap-2 text-sm font-semibold">
-              <span className="inline-block h-3 w-3 rounded-sm" style={{ backgroundColor: bySlug.get("louvor")!.color }} aria-hidden />
-              Louvor — músicas
-              {!canEditSongs && <span className="ml-auto text-xs font-normal text-black/40">🔒</span>}
-            </h3>
-            <SongsEditor
-              songs={detail.songs}
-              editable={canEditSongs}
-              saving={saveSongs.isPending}
-              onSave={(songs) => saveSongs.mutate(songs)}
-            />
-          </section>
-        )}
+      <h2 className="mb-2 mt-5 text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">
+        Ministérios
+      </h2>
+      <div className="space-y-3">
+        {sectionMinistries.map((m) => {
+          const rows = rolesFor(m);
+          const filled = rows.filter((r) => r.people.length > 0).length;
+          const isLouvor = m.slug === "louvor";
+          return (
+            <CollapsibleSection
+              key={m.id}
+              title={m.name}
+              color={m.color}
+              leaders={leadersOf(m.id)}
+              locked={!canEditMinistry(m)}
+              summary={`${filled}/${rows.length} funções preenchidas`}
+            >
+              {isLouvor && (
+                <div className="mb-4">
+                  <h4 className="mb-2 flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">
+                    Músicas
+                    {!canEditSongs && <span className="font-normal normal-case">🔒</span>}
+                  </h4>
+                  <SongsEditor
+                    songs={detail.songs}
+                    editable={canEditSongs}
+                    saving={saveSongs.isPending}
+                    onSave={(songs) => saveSongs.mutate(songs)}
+                  />
+                </div>
+              )}
+              <RosterEditor
+                title={isLouvor ? "Escala" : m.name}
+                color={m.color}
+                bare
+                rows={rows}
+                people={peopleData}
+                memberIds={membersByMinistry.get(m.id)}
+                editable={canEditMinistry(m)}
+                unavailableIds={unavailable}
+                saving={savingKey === m.slug && saveAssignments.isPending}
+                onSave={(saved) => {
+                  setSavingKey(m.slug);
+                  // One row per person; a role with several people yields several rows.
+                  saveAssignments.mutate({
+                    ministry: m.slug,
+                    assignments: saved.flatMap((r, ri) =>
+                      r.personIds.map((personId, i) => ({
+                        person_id: personId,
+                        role: r.key,
+                        sort_order: ri * 10 + i,
+                      })),
+                    ),
+                  });
+                }}
+              />
+              <MinistryNotes
+                notes={notesOf(m.id)}
+                editable={canEditMinistry(m)}
+                saving={addNote.isPending || removeNote.isPending}
+                onAdd={(body, recurring) =>
+                  addNote.mutate({
+                    ministry_id: m.id,
+                    service_id: recurring ? null : detail.service.id,
+                    body,
+                  })
+                }
+                onRemove={(noteId) => removeNote.mutate(noteId)}
+              />
+            </CollapsibleSection>
+          );
+        })}
 
-        {sectionMinistries.map((m) => (
-          <RosterEditor
-            key={m.id}
-            title={m.name}
-            color={m.color}
-            rows={rolesFor(m)}
-            people={peopleData}
-            memberIds={membersByMinistry.get(m.id)}
-            editable={canEditMinistry(m)}
-            unavailableIds={unavailable}
-            saving={savingKey === m.slug && saveAssignments.isPending}
-            onSave={(rows) => {
-              setSavingKey(m.slug);
-              // One row per person; a role with several people yields several rows.
-              saveAssignments.mutate({
-                ministry: m.slug,
-                assignments: rows.flatMap((r, ri) =>
-                  r.personIds.map((personId, i) => ({
-                    person_id: personId,
-                    role: r.key,
-                    sort_order: ri * 10 + i,
-                  })),
-                ),
-              });
-            }}
-          />
-        ))}
-
-        {/* EBD: lesson info + per-class roster (hidden on communion Sundays) */}
+        {/* EBD: lesson + per-class roster (no Sunday School on communion Sundays) */}
         {ebdMinistry && (
-          <EbdLessonCard
-            key={detail.service.id}
-            service={detail.service}
-            editable={canEditEbd}
-            saving={updateHeader.isPending}
-            onSave={(patch) => updateHeader.mutate(patch)}
-          />
-        )}
-        {ebdMinistry && detail.ebd_classes.length > 0 && (
-          <RosterEditor
-            title="Escola Bíblica Dominical"
+          <CollapsibleSection
+            title={ebdMinistry.name}
             color={ebdMinistry.color}
-            rows={detail.ebd_classes.map((c) => ({
-              key: c.id,
-              label: c.name,
-              people: detail.ebd_assignments
-                .filter((x) => x.ebd_class_id === c.id && x.person_id)
-                .map((x) => ({ id: x.person_id as string, name: x.person_name })),
-            }))}
-            people={peopleData}
-            memberIds={ebdMinistry ? membersByMinistry.get(ebdMinistry.id) : undefined}
-            editable={canEditEbd}
-            unavailableIds={unavailable}
-            saving={savingKey === "ebd" && saveEbd.isPending}
-            onSave={(rows) => {
-              setSavingKey("ebd");
-              // One PUT per class (each class is its own roster).
-              for (const r of rows) {
-                saveEbd.mutate({
-                  classId: r.key,
-                  assignments: r.personIds.map((personId, i) => ({
-                    person_id: personId,
-                    role: "Professor",
-                    sort_order: i,
-                  })),
-                });
+            leaders={leadersOf(ebdMinistry.id)}
+            locked={!canEditEbd}
+            summary={detail.service.ebd_theme ?? "sem tema definido"}
+          >
+            <EbdLessonCard
+              key={detail.service.id}
+              service={detail.service}
+              editable={canEditEbd}
+              saving={updateHeader.isPending}
+              onSave={(patch) => updateHeader.mutate(patch)}
+            />
+            {detail.ebd_classes.length > 0 && (
+              <RosterEditor
+                title="Classes"
+                color={ebdMinistry.color}
+                bare
+                rows={detail.ebd_classes.map((c) => ({
+                  key: c.id,
+                  label: c.name,
+                  people: detail.ebd_assignments
+                    .filter((x) => x.ebd_class_id === c.id && x.person_id)
+                    .map((x) => ({ id: x.person_id as string, name: x.person_name })),
+                }))}
+                people={peopleData}
+                memberIds={membersByMinistry.get(ebdMinistry.id)}
+                editable={canEditEbd}
+                unavailableIds={unavailable}
+                saving={savingKey === "ebd" && saveEbd.isPending}
+                onSave={(rows) => {
+                  setSavingKey("ebd");
+                  // One PUT per class (each class is its own roster).
+                  for (const r of rows) {
+                    saveEbd.mutate({
+                      classId: r.key,
+                      assignments: r.personIds.map((personId, i) => ({
+                        person_id: personId,
+                        role: "Professor",
+                        sort_order: i,
+                      })),
+                    });
+                  }
+                }}
+              />
+            )}
+            <MinistryNotes
+              notes={notesOf(ebdMinistry.id)}
+              editable={canEditEbd}
+              saving={addNote.isPending || removeNote.isPending}
+              onAdd={(body, recurring) =>
+                addNote.mutate({
+                  ministry_id: ebdMinistry.id,
+                  service_id: recurring ? null : detail.service.id,
+                  body,
+                })
               }
-            }}
-          />
+              onRemove={(noteId) => removeNote.mutate(noteId)}
+            />
+          </CollapsibleSection>
         )}
       </div>
     </div>
