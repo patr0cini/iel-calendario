@@ -13,7 +13,7 @@ function NavBar() {
   const own = session.ownMinistryId ? session.ministryById.get(session.ownMinistryId) : null;
 
   const linkClass = ({ isActive }: { isActive: boolean }) =>
-    "rounded-lg px-3 py-1.5 text-sm font-medium transition-colors " +
+    "rounded-lg px-2 py-1.5 text-sm font-medium transition-colors sm:px-3 " +
     (isActive
       ? "bg-indigo-600/10 text-indigo-700 dark:bg-indigo-400/15 dark:text-indigo-300"
       : "text-zinc-600 hover:bg-zinc-900/5 hover:text-zinc-900 dark:text-zinc-400 dark:hover:bg-white/10 dark:hover:text-white");
@@ -30,7 +30,7 @@ function NavBar() {
           </span>
         </NavLink>
 
-        <nav className="ml-1 flex items-center gap-0.5 sm:ml-4 sm:gap-1">
+        <nav className="ml-0.5 flex items-center gap-0.5 sm:ml-4 sm:gap-1">
           <NavLink to="/" end className={linkClass}>
             Calendário
           </NavLink>
@@ -39,21 +39,24 @@ function NavBar() {
           </NavLink>
           {session.scope === "admin" && (
             <NavLink to="/admin" className={linkClass}>
-              Administração
+              <span className="sm:hidden">Admin</span>
+              <span className="hidden sm:inline">Administração</span>
             </NavLink>
           )}
         </nav>
 
         <span
-          className="ml-auto inline-flex items-center gap-1.5 rounded-full border border-zinc-900/10 px-2.5 py-1 text-xs font-medium text-zinc-600 dark:border-white/15 dark:text-zinc-300"
+          className="ml-auto inline-flex min-w-0 items-center gap-1.5 rounded-full border border-zinc-900/10 px-2.5 py-1 text-xs font-medium text-zinc-600 dark:border-white/15 dark:text-zinc-300"
           title={own ? own.name : undefined}
         >
           <span
-            className="h-1.5 w-1.5 rounded-full"
+            className="h-1.5 w-1.5 shrink-0 rounded-full"
             style={{ backgroundColor: own?.color ?? "#6366f1" }}
             aria-hidden
           />
-          {own ? own.name : SCOPE_LABEL[session.scope]}
+          <span className="max-w-[7.5rem] truncate sm:max-w-none">
+            {own ? own.name : SCOPE_LABEL[session.scope]}
+          </span>
         </span>
       </div>
     </header>

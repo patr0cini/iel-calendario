@@ -63,8 +63,10 @@ export function RosterEditor({ title, color, rows, people, memberIds, editable, 
         {rows.map((row) => {
           const list = listFor(row.key);
           return (
-            <li key={row.key} className="grid grid-cols-[minmax(6rem,9rem)_1fr] items-start gap-2">
-              <span className="pt-1.5 text-sm text-black/70 dark:text-white/70">{row.label}</span>
+            <li key={row.key} className="grid grid-cols-1 gap-1 sm:grid-cols-[minmax(6rem,9rem)_1fr] sm:items-start sm:gap-2">
+              <span className="text-xs font-medium uppercase tracking-wide text-zinc-500 dark:text-zinc-400 sm:pt-1.5 sm:text-sm sm:font-normal sm:normal-case sm:tracking-normal">
+                {row.label}
+              </span>
               <div className="flex flex-col gap-1.5">
                 {list.length > 0 && (
                   <div className="flex flex-wrap gap-1.5">
