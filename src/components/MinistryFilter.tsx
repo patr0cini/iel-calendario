@@ -10,34 +10,38 @@ interface MinistryFilterProps {
 
 export function MinistryFilter({ ministries, selected, onToggle, onAll, onNone }: MinistryFilterProps) {
   return (
-    <aside className="w-full shrink-0 sm:w-56">
+    <aside>
       <div className="mb-2 flex items-center justify-between">
-        <h2 className="text-sm font-semibold">Ministérios</h2>
+        <h2 className="text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">
+          Ministérios
+        </h2>
         <div className="flex gap-2 text-xs">
-          <button type="button" onClick={onAll} className="text-blue-600 hover:underline">
+          <button type="button" onClick={onAll} className="link">
             Todos
           </button>
-          <button type="button" onClick={onNone} className="text-blue-600 hover:underline">
+          <button type="button" onClick={onNone} className="link">
             Nenhum
           </button>
         </div>
       </div>
-      <ul className="space-y-1">
+      <ul className="space-y-0.5">
         {ministries.map((m) => (
           <li key={m.id}>
-            <label className="flex cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 hover:bg-black/5 dark:hover:bg-white/5">
+            <label className="flex cursor-pointer items-center gap-2.5 rounded-lg px-2 py-1.5 transition-colors hover:bg-zinc-900/[0.04] dark:hover:bg-white/[0.06]">
               <input
                 type="checkbox"
                 checked={selected.has(m.id)}
                 onChange={() => onToggle(m.id)}
-                className="h-4 w-4 rounded border-black/30"
+                className="h-4 w-4 rounded border-zinc-300 accent-indigo-600"
               />
               <span
-                className="inline-block h-3 w-3 shrink-0 rounded-sm"
+                className="inline-block h-2.5 w-2.5 shrink-0 rounded-full"
                 style={{ backgroundColor: m.color }}
                 aria-hidden
               />
-              <span className="text-sm">{m.name}</span>
+              <span className={"text-sm " + (selected.has(m.id) ? "" : "text-zinc-400 dark:text-zinc-500")}>
+                {m.name}
+              </span>
             </label>
           </li>
         ))}

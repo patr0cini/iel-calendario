@@ -53,13 +53,13 @@ export function ShareButton({ serviceId, ministries }: ShareButtonProps) {
       <button
         type="button"
         onClick={() => setOpen((o) => !o)}
-        className="rounded-lg border border-black/15 px-3 py-1.5 text-sm font-medium hover:bg-black/5 dark:border-white/15 dark:hover:bg-white/10"
+        className="btn-outline px-3.5 py-1.5 text-sm"
       >
         Partilhar
       </button>
 
       {open && (
-        <div className="absolute right-0 z-40 mt-2 w-80 rounded-xl border border-black/10 bg-white p-4 shadow-lg dark:border-white/15 dark:bg-neutral-900">
+        <div className="absolute right-0 z-40 mt-2 w-80 rounded-xl border border-black/10 bg-white p-4 shadow-lg dark:border-white/15 dark:bg-zinc-900">
           <div className="mb-2 flex items-center justify-between">
             <h3 className="text-sm font-semibold">Partilhar ordem do culto</h3>
             <button type="button" onClick={() => setOpen(false)} aria-label="Fechar" className="text-black/40 hover:text-black dark:text-white/40 dark:hover:text-white">✕</button>
@@ -70,7 +70,7 @@ export function ShareButton({ serviceId, ministries }: ShareButtonProps) {
             <select
               value={scope}
               onChange={(e) => setScope(e.target.value)}
-              className="mt-1 block w-full rounded-md border border-black/15 px-2 py-1.5 text-sm dark:border-white/15 dark:bg-neutral-800"
+              className="mt-1 block input-base w-full"
             >
               <option value="all">Culto completo (todos os ministérios)</option>
               {ministries.map((m) => (
@@ -87,7 +87,7 @@ export function ShareButton({ serviceId, ministries }: ShareButtonProps) {
             <>
               <code className="block select-all break-all rounded bg-black/5 p-2 text-[11px] dark:bg-white/10">{url}</code>
               <div className="mt-2 flex gap-2">
-                <button type="button" onClick={copy} className="rounded-md bg-blue-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-blue-700">
+                <button type="button" onClick={copy} className="btn-primary px-3.5 py-1.5 text-sm">
                   {copied ? "Copiado ✓" : "Copiar link"}
                 </button>
                 {"share" in navigator && (

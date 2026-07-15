@@ -39,12 +39,12 @@ export function ServicePage() {
             type="button"
             onClick={() => admin.createService.mutate()}
             disabled={admin.createService.isPending}
-            className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"
+            className="btn-primary px-4 py-2 text-sm"
           >
             {admin.createService.isPending ? "A criar…" : "Criar culto nesta data"}
           </button>
         )}
-        <Link to="/" className="mt-4 block text-sm text-blue-600 hover:underline">← Voltar ao calendário</Link>
+        <Link to="/" className="mt-4 block link text-sm">← Voltar ao calendário</Link>
       </Centered>
     );
   }
@@ -125,32 +125,30 @@ function ServiceView({
 
   return (
     <div className="mx-auto max-w-3xl px-4 py-6 print-area">
-      <div className="mb-4 flex items-center justify-between no-print">
-        <Link to="/" className="text-sm text-blue-600 hover:underline">← Calendário</Link>
-        <div className="flex items-center gap-2">
+      <div className="mb-5 flex flex-wrap items-end justify-between gap-3">
+        <div>
+          <h1 className="text-xl font-bold capitalize tracking-tight sm:text-2xl">
+            {formatDate(detail.service.service_date)}
+          </h1>
+          <p className="mt-0.5 flex items-center gap-2 text-sm text-zinc-500 dark:text-zinc-400">
+            às {detail.service.service_time.slice(0, 5)}
+            {isCeia && (
+              <span className="rounded-full bg-amber-500/15 px-2.5 py-0.5 text-xs font-semibold text-amber-700 dark:text-amber-300">
+                Culto de Ceia
+              </span>
+            )}
+          </p>
+        </div>
+        <div className="flex items-center gap-2 no-print">
           <ShareButton
             serviceId={detail.service.id}
             ministries={[...sectionMinistries, ...(ebdMinistry ? [ebdMinistry] : [])]}
           />
-          <button
-            type="button"
-            onClick={() => window.print()}
-            className="rounded-lg border border-black/15 px-3 py-1.5 text-sm font-medium hover:bg-black/5 dark:border-white/15 dark:hover:bg-white/10"
-          >
+          <button type="button" onClick={() => window.print()} className="btn-outline px-3.5 py-1.5 text-sm">
             Imprimir
           </button>
         </div>
       </div>
-
-      <h1 className="text-xl font-bold capitalize sm:text-2xl">{formatDate(detail.service.service_date)}</h1>
-      <p className="mb-4 flex items-center gap-2 text-sm text-black/60 dark:text-white/60">
-        às {detail.service.service_time.slice(0, 5)}
-        {isCeia && (
-          <span className="rounded-full bg-amber-500/15 px-2.5 py-0.5 text-xs font-semibold text-amber-700 dark:text-amber-300">
-            Culto de Ceia
-          </span>
-        )}
-      </p>
 
       <ServiceHeaderCard
         key={detail.service.id}
@@ -173,7 +171,7 @@ function ServiceView({
       <div className="mt-4 space-y-4">
         {/* Louvor: songs + roster */}
         {bySlug.get("louvor") && (
-          <section className="rounded-lg border border-black/10 p-4 dark:border-white/10">
+          <section className="card p-4 sm:p-5">
             <h3 className="mb-3 flex items-center gap-2 text-sm font-semibold">
               <span className="inline-block h-3 w-3 rounded-sm" style={{ backgroundColor: bySlug.get("louvor")!.color }} aria-hidden />
               Louvor — músicas
@@ -280,7 +278,7 @@ function EbdLessonCard({
   const [dirty, setDirty] = useState(false);
 
   return (
-    <section className="rounded-lg border border-black/10 p-4 dark:border-white/10">
+    <section className="card p-4 sm:p-5">
       <h3 className="mb-3 flex items-center gap-2 text-sm font-semibold">
         Escola Bíblica Dominical — lição
         {!editable && <span className="ml-auto text-xs font-normal text-black/40 dark:text-white/40">🔒</span>}
@@ -295,7 +293,7 @@ function EbdLessonCard({
                 setTheme(e.target.value);
                 setDirty(true);
               }}
-              className="w-full rounded-md border border-black/15 px-2 py-1.5 text-sm dark:border-white/15 dark:bg-neutral-800"
+              className="input-base w-full"
             />
           </label>
           <label className="block">
@@ -307,7 +305,7 @@ function EbdLessonCard({
                 setDirty(true);
               }}
               rows={2}
-              className="w-full rounded-md border border-black/15 px-2 py-1.5 text-sm dark:border-white/15 dark:bg-neutral-800"
+              className="input-base w-full"
             />
           </label>
           <div className="flex justify-end">
@@ -318,7 +316,7 @@ function EbdLessonCard({
                 onSave({ ebd_theme: theme.trim() || null, ebd_notes: notes.trim() || null });
                 setDirty(false);
               }}
-              className="rounded-md bg-blue-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"
+              className="btn-primary px-3.5 py-1.5 text-sm"
             >
               {saving ? "A guardar…" : "Guardar lição"}
             </button>

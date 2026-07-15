@@ -1,14 +1,69 @@
-import { Routes, Route, Navigate } from "react-router-dom";
+import { Routes, Route, Navigate, NavLink } from "react-router-dom";
 
-import { SessionProvider } from "./session/SessionProvider";
+import { SessionProvider, useSession } from "./session/SessionProvider";
 import { CalendarPage } from "./components/CalendarPage";
 import { ServicePage } from "./components/ServicePage";
 import { EscalaPage } from "./components/EscalaPage";
 import { AdminPage } from "./components/admin/AdminPage";
 
+const SCOPE_LABEL = { admin: "Presbitério", ministry: "Ministério", readonly: "Leitura" } as const;
+
+function NavBar() {
+  const session = useSession();
+  const own = session.ownMinistryId ? session.ministryById.get(session.ownMinistryId) : null;
+
+  const linkClass = ({ isActive }: { isActive: boolean }) =>
+    "rounded-lg px-3 py-1.5 text-sm font-medium transition-colors " +
+    (isActive
+      ? "bg-indigo-600/10 text-indigo-700 dark:bg-indigo-400/15 dark:text-indigo-300"
+      : "text-zinc-600 hover:bg-zinc-900/5 hover:text-zinc-900 dark:text-zinc-400 dark:hover:bg-white/10 dark:hover:text-white");
+
+  return (
+    <header className="no-print sticky top-0 z-40 border-b border-zinc-900/5 bg-white/75 backdrop-blur-md dark:border-white/[0.06] dark:bg-zinc-950/70">
+      <div className="mx-auto flex h-14 max-w-6xl items-center gap-2 px-3 sm:gap-4 sm:px-6">
+        <NavLink to="/" className="flex items-center gap-2.5">
+          <span className="grid h-8 w-8 place-items-center rounded-xl bg-gradient-to-br from-indigo-500 to-violet-600 text-sm font-bold text-white shadow-sm">
+            I
+          </span>
+          <span className="hidden text-[15px] font-bold tracking-tight sm:block">
+            Calendário <span className="text-indigo-600 dark:text-indigo-400">IEL</span>
+          </span>
+        </NavLink>
+
+        <nav className="ml-1 flex items-center gap-0.5 sm:ml-4 sm:gap-1">
+          <NavLink to="/" end className={linkClass}>
+            Calendário
+          </NavLink>
+          <NavLink to="/escalas" className={linkClass}>
+            Escalas
+          </NavLink>
+          {session.scope === "admin" && (
+            <NavLink to="/admin" className={linkClass}>
+              Administração
+            </NavLink>
+          )}
+        </nav>
+
+        <span
+          className="ml-auto inline-flex items-center gap-1.5 rounded-full border border-zinc-900/10 px-2.5 py-1 text-xs font-medium text-zinc-600 dark:border-white/15 dark:text-zinc-300"
+          title={own ? own.name : undefined}
+        >
+          <span
+            className="h-1.5 w-1.5 rounded-full"
+            style={{ backgroundColor: own?.color ?? "#6366f1" }}
+            aria-hidden
+          />
+          {own ? own.name : SCOPE_LABEL[session.scope]}
+        </span>
+      </div>
+    </header>
+  );
+}
+
 export default function App() {
   return (
     <SessionProvider>
+      <NavBar />
       <Routes>
         <Route path="/" element={<CalendarPage />} />
         <Route path="/culto/:data" element={<ServicePage />} />

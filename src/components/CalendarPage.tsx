@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import FullCalendar from "@fullcalendar/react";
 import type {
   DateSelectArg,
@@ -235,32 +235,32 @@ export function CalendarPage() {
   const defaultMinistryId = session.ownMinistryId ?? session.ministries[0]?.id ?? "";
 
   return (
-    <div className="mx-auto max-w-6xl px-3 py-4 sm:px-6">
-      <Header session={session} />
-
+    <div className="mx-auto max-w-6xl px-3 py-5 sm:px-6">
       {pageError && (
-        <div className="mb-3 flex items-center justify-between rounded-lg border border-red-300 bg-red-50 px-3 py-2 text-sm text-red-700 dark:border-red-800 dark:bg-red-950/40 dark:text-red-300">
+        <div className="mb-3 flex items-center justify-between rounded-xl border border-red-300 bg-red-50 px-3 py-2 text-sm text-red-700 dark:border-red-800 dark:bg-red-950/40 dark:text-red-300">
           <span>{pageError}</span>
           <button type="button" onClick={() => setPageError(null)} aria-label="Fechar">✕</button>
         </div>
       )}
 
-      <div className="flex flex-col gap-4 sm:flex-row">
-        <MinistryFilter
-          ministries={session.ministries}
-          selected={selected}
-          onToggle={(id) =>
-            setHidden((prev) => {
-              const next = new Set(prev);
-              next.has(id) ? next.delete(id) : next.add(id);
-              return next;
-            })
-          }
-          onAll={() => setHidden(new Set())}
-          onNone={() => setHidden(new Set(session.ministries.map((m) => m.id)))}
-        />
+      <div className="flex flex-col gap-4 lg:flex-row">
+        <div className="card h-fit shrink-0 p-4 lg:w-60">
+          <MinistryFilter
+            ministries={session.ministries}
+            selected={selected}
+            onToggle={(id) =>
+              setHidden((prev) => {
+                const next = new Set(prev);
+                next.has(id) ? next.delete(id) : next.add(id);
+                return next;
+              })
+            }
+            onAll={() => setHidden(new Set())}
+            onNone={() => setHidden(new Set(session.ministries.map((m) => m.id)))}
+          />
+        </div>
 
-        <div className="min-w-0 flex-1">
+        <div className="card min-w-0 flex-1 p-3 sm:p-5">
           {eventsQuery.isError && (
             <p className="mb-2 text-sm text-red-600">Não foi possível carregar os eventos.</p>
           )}
@@ -319,26 +319,6 @@ export function CalendarPage() {
   );
 }
 
-function Header({ session }: { session: ReturnType<typeof useSession> }) {
-  const scopeLabel =
-    session.scope === "admin" ? "Presbitério" : session.scope === "ministry" ? "Ministério" : "Leitura";
-  const own = session.ownMinistryId ? session.ministryById.get(session.ownMinistryId) : null;
-  return (
-    <header className="mb-4 flex flex-wrap items-center justify-between gap-2">
-      <div>
-        <h1 className="text-xl font-bold tracking-tight sm:text-2xl">Calendário — IEL</h1>
-        {own && <p className="text-sm text-black/60 dark:text-white/60">{own.name}</p>}
-      </div>
-      <div className="flex items-center gap-3">
-        <Link to="/escalas" className="text-sm font-medium text-blue-600 hover:underline">Escalas</Link>
-        {session.scope === "admin" && (
-          <Link to="/admin" className="text-sm font-medium text-blue-600 hover:underline">Administração</Link>
-        )}
-        <span className="rounded-full bg-black/5 px-3 py-1 text-xs font-medium dark:bg-white/10">{scopeLabel}</span>
-      </div>
-    </header>
-  );
-}
 
 function readStoredHidden(): Set<string> {
   try {

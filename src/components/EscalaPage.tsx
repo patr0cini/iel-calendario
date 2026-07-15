@@ -83,28 +83,27 @@ export function EscalaPage() {
   return (
     <div className="mx-auto max-w-6xl px-4 py-6">
       <div className="mb-4 flex flex-wrap items-center gap-3">
-        <Link to="/" className="text-sm text-blue-600 hover:underline">← Calendário</Link>
-        <h1 className="text-xl font-bold">Escala</h1>
+        <h1 className="text-xl font-bold tracking-tight">Escala</h1>
         <select value={slug} onChange={(e) => setParam("ministerio", e.target.value)} className={ctrl}>
           {selectable.map((m) => (
             <option key={m.id} value={m.slug}>{m.name}</option>
           ))}
         </select>
-        <label className="text-sm">De <input type="date" value={from} onChange={(e) => setParam("de", e.target.value)} className={ctrl} /></label>
-        <label className="text-sm">Até <input type="date" value={to} onChange={(e) => setParam("ate", e.target.value)} className={ctrl} /></label>
-        {!editable && <span className="text-xs text-black/40">🔒 leitura</span>}
+        <label className="flex items-center gap-1.5 text-sm text-zinc-500 dark:text-zinc-400">De <input type="date" value={from} onChange={(e) => setParam("de", e.target.value)} className={ctrl} /></label>
+        <label className="flex items-center gap-1.5 text-sm text-zinc-500 dark:text-zinc-400">Até <input type="date" value={to} onChange={(e) => setParam("ate", e.target.value)} className={ctrl} /></label>
+        {!editable && <span className="text-xs text-zinc-400">🔒 leitura</span>}
       </div>
 
       {list.isLoading ? (
-        <p className="text-sm text-black/60">A carregar…</p>
+        <p className="text-sm text-zinc-500">A carregar…</p>
       ) : roles.length === 0 ? (
-        <p className="text-sm text-black/60">Sem funções definidas para este ministério.</p>
+        <p className="text-sm text-zinc-500">Sem funções definidas para este ministério.</p>
       ) : (
-        <div className="overflow-x-auto">
+        <div className="card overflow-x-auto p-2 sm:p-3">
           <table className="w-full border-collapse text-sm">
             <thead>
               <tr>
-                <th className="sticky left-0 bg-white p-2 text-left font-semibold dark:bg-neutral-900">Domingo</th>
+                <th className="sticky left-0 bg-white p-2 text-left font-semibold dark:bg-zinc-900">Domingo</th>
                 {roles.map((r) => (
                   <th key={r.id} className="p-2 text-left font-medium">{r.name}</th>
                 ))}
@@ -117,8 +116,8 @@ export function EscalaPage() {
                 const unavailable = new Set(detail?.unavailable_person_ids ?? []);
                 return (
                   <tr key={s.id} className="border-t border-black/10 dark:border-white/10">
-                    <td className="sticky left-0 bg-white p-2 dark:bg-neutral-900">
-                      <Link to={`/culto/${s.service_date}`} className="text-blue-600 hover:underline">{shortDate(s.service_date)}</Link>
+                    <td className="sticky left-0 bg-white p-2 dark:bg-zinc-900">
+                      <Link to={`/culto/${s.service_date}`} className="link">{shortDate(s.service_date)}</Link>
                     </td>
                     {roles.map((r) => {
                       // Communion roles only apply to first Sundays.
@@ -198,4 +197,4 @@ export function EscalaPage() {
   );
 }
 
-const ctrl = "rounded-md border border-black/15 px-2 py-1.5 text-sm dark:border-white/15 dark:bg-neutral-800";
+const ctrl = "input-base";

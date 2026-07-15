@@ -77,7 +77,7 @@ export function EventModal(props: EventModalProps) {
       aria-label={heading}
     >
       <div
-        className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-t-2xl bg-white p-6 shadow-xl dark:bg-neutral-900 sm:rounded-2xl"
+        className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-t-2xl bg-white p-6 shadow-xl dark:bg-zinc-900 sm:rounded-2xl"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="mb-4 flex items-start justify-between gap-4">
@@ -164,10 +164,10 @@ export function EventModal(props: EventModalProps) {
               <span />
             )}
             <div className="flex gap-2">
-              <button type="button" onClick={onClose} className="rounded-lg px-4 py-2 text-sm font-medium hover:bg-black/5 dark:hover:bg-white/10">
+              <button type="button" onClick={onClose} className="btn-outline px-4 py-2 text-sm">
                 Cancelar
               </button>
-              <button type="button" onClick={submit} disabled={saving} className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-60">
+              <button type="button" onClick={submit} disabled={saving} className="btn-primary px-4 py-2 text-sm">
                 {saving ? "A guardar…" : "Guardar"}
               </button>
             </div>
@@ -179,7 +179,7 @@ export function EventModal(props: EventModalProps) {
 }
 
 const inputClass =
-  "w-full rounded-lg border border-black/15 bg-white px-3 py-2 text-sm outline-none focus:border-blue-500 disabled:bg-black/5 disabled:text-black/60 dark:border-white/15 dark:bg-neutral-800 dark:disabled:bg-white/5 dark:disabled:text-white/50";
+  "input-base w-full px-3 py-2 disabled:bg-zinc-100 disabled:text-zinc-500 dark:disabled:bg-white/5 dark:disabled:text-white/50";
 
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (

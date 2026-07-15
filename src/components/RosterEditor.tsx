@@ -51,7 +51,7 @@ export function RosterEditor({ title, color, rows, people, memberIds, editable, 
     people.find((p) => p.id === id)?.full_name ?? row.people.find((p) => p.id === id)?.name ?? "—";
 
   return (
-    <section className="rounded-lg border border-black/10 p-4 dark:border-white/10">
+    <section className="card p-4 sm:p-5">
       <h3 className="mb-3 flex items-center gap-2 text-sm font-semibold">
         <span className="inline-block h-3 w-3 rounded-sm" style={{ backgroundColor: color }} aria-hidden />
         {title}
@@ -105,7 +105,7 @@ export function RosterEditor({ title, color, rows, people, memberIds, editable, 
               onSave(rows.map((r) => ({ key: r.key, personIds: [...new Set(listFor(r.key))] })));
               setDirty(false);
             }}
-            className="rounded-md bg-blue-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"
+            className="btn-primary px-3.5 py-1.5 text-sm"
           >
             {saving ? "A guardar…" : "Guardar"}
           </button>

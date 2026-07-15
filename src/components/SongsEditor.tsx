@@ -95,7 +95,7 @@ export function SongsEditor({ songs, editable, saving, onSave }: SongsEditorProp
         </div>
       ))}
       <div className="flex justify-between">
-        <button type="button" onClick={add} className="rounded-md px-3 py-1.5 text-sm font-medium text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-950/40">
+        <button type="button" onClick={add} className="rounded-md px-3 py-1.5 text-sm font-medium text-indigo-600 dark:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-950/40">
           + Música
         </button>
         <button
@@ -115,7 +115,7 @@ export function SongsEditor({ songs, editable, saving, onSave }: SongsEditorProp
             );
             setDirty(false);
           }}
-          className="rounded-md bg-blue-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"
+          className="btn-primary px-3.5 py-1.5 text-sm"
         >
           {saving ? "A guardar…" : "Guardar músicas"}
         </button>
@@ -124,4 +124,4 @@ export function SongsEditor({ songs, editable, saving, onSave }: SongsEditorProp
   );
 }
 
-const cell = "w-full rounded-md border border-black/15 px-2 py-1.5 text-sm dark:border-white/15 dark:bg-neutral-800";
+const cell = "input-base w-full";

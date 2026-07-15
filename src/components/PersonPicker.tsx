@@ -88,11 +88,11 @@ export function PersonPicker({ people, memberIds, exclude, placeholder, compact,
           (compact
             ? "w-full rounded border border-dashed border-black/20 px-1.5 py-1 text-sm "
             : "w-full rounded-md border border-dashed border-black/20 px-2 py-1.5 text-sm ") +
-          "bg-transparent placeholder:text-black/40 focus:border-blue-500 focus:border-solid dark:border-white/20 dark:placeholder:text-white/40"
+          "bg-transparent placeholder:text-black/40 focus:border-indigo-500 focus:border-solid dark:border-white/20 dark:placeholder:text-white/40"
         }
       />
       {open && suggestions.length > 0 && (
-        <ul className="absolute left-0 right-0 z-30 mt-1 max-h-56 overflow-y-auto rounded-md border border-black/10 bg-white py-1 text-sm shadow-lg dark:border-white/15 dark:bg-neutral-800">
+        <ul className="absolute left-0 right-0 z-30 mt-1 max-h-56 overflow-y-auto rounded-md border border-black/10 bg-white py-1 text-sm shadow-lg dark:border-white/15 dark:bg-zinc-800">
           {suggestions.map((s, i) => (
             <li key={s.p.id}>
               {hasGroups && i === firstOtherIndex && (
@@ -109,7 +109,7 @@ export function PersonPicker({ people, memberIds, exclude, placeholder, compact,
                 onMouseEnter={() => setHighlight(i)}
                 className={
                   "block w-full px-2 py-1.5 text-left " +
-                  (i === highlight ? "bg-blue-600 text-white" : "")
+                  (i === highlight ? "bg-indigo-600 text-white" : "")
                 }
               >
                 {s.p.full_name}
@@ -119,7 +119,7 @@ export function PersonPicker({ people, memberIds, exclude, placeholder, compact,
         </ul>
       )}
       {open && query.trim() !== "" && suggestions.length === 0 && (
-        <div className="absolute left-0 right-0 z-30 mt-1 rounded-md border border-black/10 bg-white px-2 py-1.5 text-sm text-black/50 shadow-lg dark:border-white/15 dark:bg-neutral-800 dark:text-white/50">
+        <div className="absolute left-0 right-0 z-30 mt-1 rounded-md border border-black/10 bg-white px-2 py-1.5 text-sm text-black/50 shadow-lg dark:border-white/15 dark:bg-zinc-800 dark:text-white/50">
           Sem resultados.
         </div>
       )}

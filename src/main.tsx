@@ -6,6 +6,7 @@ import { BrowserRouter } from "react-router-dom";
 import App from "./App";
 import { queryClient } from "./lib/queryClient";
 import { initSessionFromUrl } from "./lib/session";
+import "@fontsource-variable/inter/index.css";
 import "./index.css";
 
 // Read the access token from the URL fragment before the app renders.

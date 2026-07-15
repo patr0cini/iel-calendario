@@ -32,7 +32,7 @@ export function AdminPage() {
         <p className="mt-2 text-sm text-black/60 dark:text-white/60">
           A administração está reservada ao Presbitério.
         </p>
-        <Link to="/" className="mt-4 inline-block text-sm text-blue-600 hover:underline">
+        <Link to="/" className="mt-4 inline-block link text-sm">
           ← Voltar ao calendário
         </Link>
       </div>
@@ -41,14 +41,12 @@ export function AdminPage() {
 
   return (
     <div className="mx-auto max-w-5xl px-4 py-6">
-      <div className="mb-4 flex items-center justify-between">
-        <div className="flex items-baseline gap-3">
-          <Link to="/" className="text-sm text-blue-600 hover:underline">← Calendário</Link>
-          <h1 className="text-xl font-bold">Administração</h1>
-        </div>
-      </div>
+      <h1 className="mb-4 text-xl font-bold tracking-tight">Administração</h1>
 
-      <nav className="mb-4 flex flex-wrap gap-1 border-b border-black/10 dark:border-white/10" role="tablist">
+      <nav
+        className="mb-5 flex w-fit max-w-full flex-wrap gap-1 rounded-xl bg-zinc-900/[0.05] p-1 dark:bg-white/[0.07]"
+        role="tablist"
+      >
         {TABS.map((t) => (
           <button
             key={t.key}
@@ -57,10 +55,10 @@ export function AdminPage() {
             aria-selected={tab === t.key}
             onClick={() => setTab(t.key)}
             className={
-              "-mb-px rounded-t-md px-3 py-2 text-sm font-medium " +
+              "rounded-lg px-3 py-1.5 text-sm font-medium transition-colors " +
               (tab === t.key
-                ? "border border-b-0 border-black/10 bg-white dark:border-white/10 dark:bg-neutral-900"
-                : "text-black/60 hover:text-black dark:text-white/60 dark:hover:text-white")
+                ? "bg-white text-zinc-900 shadow-sm dark:bg-zinc-800 dark:text-white"
+                : "text-zinc-500 hover:text-zinc-800 dark:text-zinc-400 dark:hover:text-zinc-100")
             }
           >
             {t.label}

@@ -1,9 +1,9 @@
 // Small shared UI bits for the admin tabs.
 
 export const input =
-  "rounded-md border border-black/15 px-2 py-1.5 text-sm dark:border-white/15 dark:bg-neutral-800";
+  "input-base";
 export const btnPrimary =
-  "rounded-md bg-blue-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50";
+  "btn-primary px-3.5 py-1.5 text-sm";
 export const btnGhost =
   "rounded-md px-2 py-1 text-sm hover:bg-black/5 dark:hover:bg-white/10";
 export const btnDanger =
@@ -11,7 +11,7 @@ export const btnDanger =
 
 export function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
-    <section className="rounded-lg border border-black/10 p-4 dark:border-white/10">
+    <section className="card p-4 sm:p-5">
       <h3 className="mb-3 text-sm font-semibold">{title}</h3>
       {children}
     </section>

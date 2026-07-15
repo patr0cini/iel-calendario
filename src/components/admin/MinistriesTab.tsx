@@ -160,7 +160,7 @@ function RolesEditor({ ministry }: { ministry: Ministry }) {
             ))}
           </ul>
           <div className="mt-2 flex justify-between">
-            <button type="button" className={btnGhost + " text-blue-600"} onClick={() => setDraft([...names, ""])}>
+            <button type="button" className={btnGhost + " text-indigo-600 dark:text-indigo-400"} onClick={() => setDraft([...names, ""])}>
               + Função
             </button>
             <button
