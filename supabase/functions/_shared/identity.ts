@@ -90,11 +90,14 @@ async function scopeForPerson(
 
 async function identityFromMicrosoft(db: SupabaseClient, token: string): Promise<Identity> {
   const { email, name } = await verifyMicrosoftToken(token);
-  const { data: person } = await db
+  // Match either address: people may sign in with their institutional or their
+  // personal email (email_alt).
+  const { data: matches } = await db
     .from("people")
     .select("id, full_name, active")
-    .ilike("email", email)
-    .maybeSingle();
+    .or(`email.ilike.${email},email_alt.ilike.${email}`)
+    .limit(1);
+  const person = matches?.[0] ?? null;
 
   if (!person) {
     throw new HttpError(403, `A conta ${email} não está associada a nenhuma pessoa. Pede ao Presbitério para a associar.`);

@@ -180,6 +180,7 @@ export interface PersonFull {
   id: string;
   full_name: string;
   email: string | null;
+  email_alt: string | null;
   phone: string | null;
   active: boolean;
   notes: string | null;

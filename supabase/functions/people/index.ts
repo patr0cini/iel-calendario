@@ -19,6 +19,7 @@ import type { Identity } from "../_shared/identity.ts";
 interface PersonInput {
   full_name?: string;
   email?: string | null;
+  email_alt?: string | null;
   phone?: string | null;
   active?: boolean;
   notes?: string | null;
@@ -65,7 +66,7 @@ Deno.serve(async (req) => {
       requireScope(identity, "admin", "ministry");
       const columns =
         identity.scope === "admin"
-          ? "id, full_name, email, phone, active, notes, created_at"
+          ? "id, full_name, email, email_alt, phone, active, notes, created_at"
           : "id, full_name, active"; // ministry: no contact details
       const { data, error } = await db.from("people").select(columns).order("full_name");
       if (error) throw new HttpError(500, error.message);
@@ -81,6 +82,7 @@ Deno.serve(async (req) => {
         .insert({
           full_name: body.full_name,
           email: body.email ?? null,
+          email_alt: body.email_alt ?? null,
           phone: body.phone ?? null,
           active: body.active ?? true,
           notes: body.notes ?? null,
@@ -108,6 +110,7 @@ Deno.serve(async (req) => {
         .update({
           ...(body.full_name !== undefined && { full_name: body.full_name }),
           ...(body.email !== undefined && { email: body.email }),
+          ...(body.email_alt !== undefined && { email_alt: body.email_alt }),
           ...(body.phone !== undefined && { phone: body.phone }),
           ...(body.active !== undefined && { active: body.active }),
           ...(body.notes !== undefined && { notes: body.notes }),

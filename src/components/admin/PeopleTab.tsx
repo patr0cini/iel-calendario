@@ -91,7 +91,16 @@ export function PeopleTab() {
                       const v = e.target.value.trim() || null;
                       if (v !== p.email) update.mutate({ id: p.id, patch: { email: v } });
                     }}
-                    className={input + " w-48"}
+                    className={input + " w-44"}
+                  />
+                  <input
+                    defaultValue={p.email_alt ?? ""}
+                    placeholder="2º email"
+                    onBlur={(e) => {
+                      const v = e.target.value.trim() || null;
+                      if (v !== p.email_alt) update.mutate({ id: p.id, patch: { email_alt: v } });
+                    }}
+                    className={input + " w-44"}
                   />
                   <label className="flex items-center gap-1 text-xs">
                     <input
