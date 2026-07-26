@@ -3,9 +3,10 @@ import react from "@vitejs/plugin-react";
 import path from "node:path";
 import { execSync } from "node:child_process";
 
-// GitHub Pages project sites are served from "/<repo>/". Set VITE_BASE_PATH at
-// build time. Local dev keeps "/".
-const base = process.env.VITE_BASE_PATH ?? "/";
+// Served at the root of the custom domain (app.iel.pt), so the base is "/".
+// (It was "/<repo>/" while on the github.io project URL.) Hardcoded rather than
+// read from VITE_BASE_PATH because deploy.yml still passes the old repo path.
+const base = "/";
 
 // The commit the site was built from, shown in the corner: the only version
 // number that cannot drift from what is actually deployed.
