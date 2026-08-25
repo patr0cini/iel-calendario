@@ -122,16 +122,16 @@ function ServiceView({
   const ebdMinistry = isCeia ? undefined : bySlug.get("ebd");
   const canEditEbd = ebdMinistry ? canEditMinistry(ebdMinistry) : false;
 
-  // The preacher is exclusive to Presbitério and Convidados members.
+  // The preacher comes from any ministry flagged supplies_preachers
+  // (Pregadores, Presbitério, Convidados — configured in the DB).
   const preacherOptions = useMemo(() => {
     const allowed = new Set<string>();
-    for (const slug of ["presbiterio", "convidados"]) {
-      const m = bySlug.get(slug);
-      if (!m) continue;
+    for (const m of detail.ministries) {
+      if (!m.supplies_preachers) continue;
       for (const id of membersByMinistry.get(m.id) ?? []) allowed.add(id);
     }
     return peopleData.filter((p) => allowed.has(p.id));
-  }, [bySlug, membersByMinistry, peopleData]);
+  }, [detail.ministries, membersByMinistry, peopleData]);
 
   return (
     <div className="mx-auto max-w-3xl px-4 py-6 print-area">

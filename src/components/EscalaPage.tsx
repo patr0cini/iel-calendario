@@ -78,8 +78,8 @@ export function EscalaPage() {
     onSuccess: (data, v) => qc.setQueryData(["service", v.date], data),
   });
 
-  // The preacher lives on the service (not a roster role) and is scheduled here
-  // in the Presbitério's grid. It is exclusive to Presbitério/Convidados.
+  // The preacher lives on the service (not a roster role), scheduled from the
+  // grid of any preacher-supplying ministry (Pregadores, Presbitério…).
   const savePreacher = useMutation({
     mutationFn: (v: { serviceId: string; date: string; preacherId: string | null }) =>
       apiFetch<ServiceHeader>(`/services/${v.serviceId}`, {
@@ -89,16 +89,19 @@ export function EscalaPage() {
     onSuccess: (_data, v) => qc.invalidateQueries({ queryKey: ["service", v.date] }),
   });
 
-  const isPresbiterio = ministry?.slug === "presbiterio";
+  // The Pregador column appears in the grid of any ministry that supplies
+  // preachers (Pregadores, Presbitério…); its options are the union of all
+  // preacher ministries' members.
+  const showPreacher = Boolean(ministry?.supplies_preachers);
   const preacherPeople = useMemo(() => {
-    if (!isPresbiterio) return [];
+    if (!showPreacher) return [];
     const allowed = new Set<string>();
-    for (const s of ["presbiterio", "convidados"]) {
-      const m = session.ministries.find((mm) => mm.slug === s);
-      if (m) for (const id of membersByMinistry.get(m.id) ?? []) allowed.add(id);
+    for (const m of session.ministries) {
+      if (!m.supplies_preachers) continue;
+      for (const id of membersByMinistry.get(m.id) ?? []) allowed.add(id);
     }
     return (people.data ?? []).filter((p) => allowed.has(p.id));
-  }, [isPresbiterio, session.ministries, membersByMinistry, people.data]);
+  }, [showPreacher, session.ministries, membersByMinistry, people.data]);
 
   const peopleList = people.data ?? [];
 
@@ -118,7 +121,7 @@ export function EscalaPage() {
 
       {list.isLoading ? (
         <p className="text-sm text-zinc-500">A carregar…</p>
-      ) : roles.length === 0 ? (
+      ) : roles.length === 0 && !showPreacher ? (
         <p className="text-sm text-zinc-500">Sem funções definidas para este ministério.</p>
       ) : (
         <div className="card overflow-x-auto p-2 sm:p-3">
@@ -126,7 +129,7 @@ export function EscalaPage() {
             <thead>
               <tr>
                 <th className="sticky left-0 bg-white p-2 text-left font-semibold dark:bg-zinc-900">Domingo</th>
-                {isPresbiterio && <th className="p-2 text-left font-medium">Pregador</th>}
+                {showPreacher && <th className="p-2 text-left font-medium">Pregador</th>}
                 {roles.map((r) => (
                   <th key={r.id} className="p-2 text-left font-medium">{r.name}</th>
                 ))}
@@ -142,7 +145,7 @@ export function EscalaPage() {
                     <td className="sticky left-0 bg-white p-2 dark:bg-zinc-900">
                       <Link to={`/culto/${s.service_date}`} className="link">{shortDate(s.service_date)}</Link>
                     </td>
-                    {isPresbiterio && (
+                    {showPreacher && (
                       <td className="min-w-36 p-1 align-top">
                         <div className="flex flex-col gap-1">
                           {detail?.service.preacher_id ? (

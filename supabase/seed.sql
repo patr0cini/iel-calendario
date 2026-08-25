@@ -11,11 +11,15 @@ insert into ministries (slug, name, color, sort_order) values
   ('assistentes', 'Assistentes', '#d97706', 4),
   ('ebd', 'Escola Bíblica Dominical', '#dc2626', 5),
   ('412', '412 (Adolescentes e Jovens)', '#db2777', 6),
-  ('convidados', 'Convidados', '#64748b', 7) -- guest preachers pool
+  ('convidados', 'Convidados', '#64748b', 7), -- guest preachers pool
+  ('pregadores', 'Pregadores', '#0e7490', 12) -- preacher pool
 on conflict (slug) do nothing;
 
 -- Membership of these ministries grants platform admin (see identity.ts).
 update ministries set grants_admin = true where slug in ('presbiterio', 'secretariado');
+
+-- Membership of these ministries makes a person an eligible preacher.
+update ministries set supplies_preachers = true where slug in ('pregadores', 'presbiterio', 'convidados');
 
 -- Calendar buckets and people pools are not ministries (see the filter groups).
 update ministries set category = 'outro' where slug in ('culto', 'convidados', 'eventos');

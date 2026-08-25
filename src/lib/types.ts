@@ -14,6 +14,8 @@ export interface Ministry {
   sort_order: number;
   active: boolean;
   category: MinistryCategory;
+  /** Members of a supplies_preachers ministry may be scheduled as the preacher. */
+  supplies_preachers?: boolean;
 }
 
 export interface EventRow {
