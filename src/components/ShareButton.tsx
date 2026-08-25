@@ -25,7 +25,14 @@ export function ShareButton({ serviceId, ministries }: ShareButtonProps) {
     setError(false);
     let cancelled = false;
     apiFetch<{ url: string }>(`/services/${serviceId}/share-link?ministry=${encodeURIComponent(scope)}`)
-      .then((r) => !cancelled && setUrl(r.url))
+      .then((r) => {
+        if (cancelled) return;
+        // The server returns a Supabase URL; the shareable page lives on our own
+        // domain (Supabase can't serve rendered HTML). Rebuild it with the sig.
+        const sig = new URL(r.url).searchParams.get("sig") ?? "";
+        const appUrl = `${window.location.origin}${import.meta.env.BASE_URL}partilha/${serviceId}?ministry=${encodeURIComponent(scope)}&sig=${sig}`;
+        setUrl(appUrl);
+      })
       .catch(() => !cancelled && setError(true));
     return () => {
       cancelled = true;

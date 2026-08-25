@@ -8,6 +8,7 @@
 import { serviceClient } from "../_shared/supabase.ts";
 import { shareSignature } from "../_shared/crypto.ts";
 import { buildDetail, isFirstSundayOfMonth, type ServiceDetail } from "../_shared/service-detail.ts";
+import { corsHeaders } from "../_shared/cors.ts";
 import { HttpError, errorResponse, pathSegments, preflight } from "../_shared/http.ts";
 
 function esc(text: unknown): string {
@@ -267,9 +268,13 @@ Deno.serve(async (req) => {
 
     const db = serviceClient();
     const detail = await buildDetail(db, id);
+    // Supabase forces text/plain on text/html responses from *.supabase.co
+    // (anti-phishing), so the app fetches this HTML cross-origin and renders it
+    // in an iframe on its own domain — hence the CORS headers.
     return new Response(pageHtml(detail, ministry), {
       status: 200,
       headers: {
+        ...corsHeaders(req.headers.get("origin")),
         "Content-Type": "text/html; charset=utf-8",
         "Cache-Control": "no-store",
         "X-Robots-Tag": "noindex",
