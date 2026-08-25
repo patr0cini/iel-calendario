@@ -78,6 +78,28 @@ export function EscalaPage() {
     onSuccess: (data, v) => qc.setQueryData(["service", v.date], data),
   });
 
+  // The preacher lives on the service (not a roster role) and is scheduled here
+  // in the Presbitério's grid. It is exclusive to Presbitério/Convidados.
+  const savePreacher = useMutation({
+    mutationFn: (v: { serviceId: string; date: string; preacherId: string | null }) =>
+      apiFetch<ServiceHeader>(`/services/${v.serviceId}`, {
+        method: "PATCH",
+        body: { preacher_id: v.preacherId },
+      }),
+    onSuccess: (_data, v) => qc.invalidateQueries({ queryKey: ["service", v.date] }),
+  });
+
+  const isPresbiterio = ministry?.slug === "presbiterio";
+  const preacherPeople = useMemo(() => {
+    if (!isPresbiterio) return [];
+    const allowed = new Set<string>();
+    for (const s of ["presbiterio", "convidados"]) {
+      const m = session.ministries.find((mm) => mm.slug === s);
+      if (m) for (const id of membersByMinistry.get(m.id) ?? []) allowed.add(id);
+    }
+    return (people.data ?? []).filter((p) => allowed.has(p.id));
+  }, [isPresbiterio, session.ministries, membersByMinistry, people.data]);
+
   const peopleList = people.data ?? [];
 
   return (
@@ -104,6 +126,7 @@ export function EscalaPage() {
             <thead>
               <tr>
                 <th className="sticky left-0 bg-white p-2 text-left font-semibold dark:bg-zinc-900">Domingo</th>
+                {isPresbiterio && <th className="p-2 text-left font-medium">Pregador</th>}
                 {roles.map((r) => (
                   <th key={r.id} className="p-2 text-left font-medium">{r.name}</th>
                 ))}
@@ -119,6 +142,36 @@ export function EscalaPage() {
                     <td className="sticky left-0 bg-white p-2 dark:bg-zinc-900">
                       <Link to={`/culto/${s.service_date}`} className="link">{shortDate(s.service_date)}</Link>
                     </td>
+                    {isPresbiterio && (
+                      <td className="min-w-36 p-1 align-top">
+                        <div className="flex flex-col gap-1">
+                          {detail?.service.preacher_id ? (
+                            <div className="flex flex-wrap gap-1">
+                              <PersonChip
+                                compact
+                                name={detail.service.preacher_name ?? "•"}
+                                unavailable={unavailable.has(detail.service.preacher_id)}
+                                onRemove={
+                                  editable
+                                    ? () => savePreacher.mutate({ serviceId: detail.service.id, date: s.service_date, preacherId: null })
+                                    : undefined
+                                }
+                              />
+                            </div>
+                          ) : (
+                            !editable && <span className="text-black/25">—</span>
+                          )}
+                          {editable && detail && !detail.service.preacher_id && (
+                            <PersonPicker
+                              compact
+                              people={preacherPeople}
+                              placeholder="+ pregador…"
+                              onPick={(p) => savePreacher.mutate({ serviceId: detail.service.id, date: s.service_date, preacherId: p.id })}
+                            />
+                          )}
+                        </div>
+                      </td>
+                    )}
                     {roles.map((r) => {
                       // Communion roles only apply to first Sundays.
                       if (isCeiaRole(r.name) && !isFirstSundayOfMonth(s.service_date)) {

@@ -12,20 +12,30 @@ const TENANT_ID = import.meta.env.VITE_MS_TENANT_ID;
 export const microsoftEnabled = Boolean(CLIENT_ID && TENANT_ID);
 
 let instance: PublicClientApplication | null = null;
+// getAllAccounts() throws until initialize() resolves, so gate reads on this.
+let initialized = false;
+// Shared init promise so concurrent callers (e.g. StrictMode's double effect)
+// never get a half-built instance.
+let initPromise: Promise<PublicClientApplication> | null = null;
 
-async function getInstance(): Promise<PublicClientApplication> {
-  if (!instance) {
-    instance = new PublicClientApplication({
-      auth: {
-        clientId: CLIENT_ID,
-        authority: `https://login.microsoftonline.com/${TENANT_ID}`,
-        redirectUri: window.location.origin + import.meta.env.BASE_URL,
-      },
-      cache: { cacheLocation: "sessionStorage" },
-    });
-    await instance.initialize();
+function getInstance(): Promise<PublicClientApplication> {
+  if (!initPromise) {
+    initPromise = (async () => {
+      const app = new PublicClientApplication({
+        auth: {
+          clientId: CLIENT_ID,
+          authority: `https://login.microsoftonline.com/${TENANT_ID}`,
+          redirectUri: window.location.origin + import.meta.env.BASE_URL,
+        },
+        cache: { cacheLocation: "sessionStorage" },
+      });
+      await app.initialize();
+      instance = app;
+      initialized = true;
+      return app;
+    })();
   }
-  return instance;
+  return initPromise;
 }
 
 function account(app: PublicClientApplication): AccountInfo | null {
@@ -52,7 +62,8 @@ export async function signOutMicrosoft(): Promise<void> {
 }
 
 export function hasMicrosoftAccount(): boolean {
-  return Boolean(instance && account(instance));
+  if (!instance || !initialized) return false;
+  return account(instance) !== null;
 }
 
 /**
