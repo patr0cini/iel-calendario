@@ -172,3 +172,7 @@ backend = "postgres"
 [functions.ebd-signup]
 enabled = true
 verify_jwt = false
+
+[functions.ebd-attendance]
+enabled = true
+verify_jwt = false

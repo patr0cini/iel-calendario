@@ -47,6 +47,8 @@
   li.evento .title{font-weight:600;color:var(--event-ink)}
   li.evento{background:var(--event)}
   li.past{opacity:.45}
+  li.com-pres{opacity:1}
+  li.com-pres .open{display:none}
   li.is-next{box-shadow:inset 4px 0 0 var(--accent)}
   .escala{display:grid;gap:5px;margin-top:7px}
   .classe{display:flex;flex-wrap:wrap;align-items:center;gap:4px 6px;font-size:.8rem}
@@ -70,6 +72,21 @@
   .conta .ms:hover{background:#f7f8f8}
   .conta .link{border:0;background:none;padding:0;font:inherit;color:var(--accent);text-decoration:underline;cursor:pointer}
   #g-btn{min-height:40px}
+  .pres-btn{margin-top:8px;font:inherit;font-size:.8rem;padding:4px 12px;border-radius:999px;border:1px solid var(--pink);background:#fff;color:var(--event-ink);cursor:pointer}
+  .pres-btn:hover{background:var(--event)}
+  .pres{margin-top:10px;padding:12px;border:1px solid var(--line);border-radius:10px;background:var(--bg);display:grid;gap:12px}
+  .pres fieldset{border:0;margin:0;padding:0;min-width:0}
+  .pres legend{font-weight:600;font-size:.85rem;padding:0;margin-bottom:4px}
+  .pres legend small{font-weight:400;color:var(--muted)}
+  .criancas{display:flex;flex-wrap:wrap;gap:4px 14px}
+  .criancas label{display:flex;align-items:center;gap:6px;font-size:.9rem;cursor:pointer;min-height:32px}
+  .criancas input{width:18px;height:18px;accent-color:var(--accent)}
+  .nova{display:flex;gap:6px;margin-top:6px;flex-wrap:wrap}
+  .nova input{font:inherit;font-size:.85rem;padding:5px 9px;border:1px solid var(--line);border-radius:8px;flex:1 1 160px;min-width:0}
+  .nova button,.pres .acoes button{font:inherit;font-size:.85rem;padding:5px 12px;border-radius:8px;border:1px solid var(--accent);background:var(--card);color:var(--accent);cursor:pointer}
+  .pres .acoes{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+  .pres .acoes .principal{background:var(--accent);color:#fff}
+  .pres .vazio{color:var(--muted);font-size:.85rem}
   .hidden{display:none}
   footer{max-width:820px;margin:0 auto;padding:0 20px 32px;color:var(--muted);font-size:.85rem}
   footer a{color:var(--muted)}
@@ -620,8 +637,9 @@ function render(){
   for (const m of Object.keys(porMes).map(Number).sort((a,b)=>a-b)) {
     const linhas = porMes[m].map(l => {
       const d = parse(l.data), passada = d < hoje;
-      if (passada && esconderPassadas) return "";
-      const cls = [l.tipo, passada?"past":"", l===proxima?"is-next":""].join(" ");
+      const recente = podePresencas() && l.tipo === "licao" && hoje - d <= 14 * 864e5;
+      if (passada && esconderPassadas && !recente) return "";
+      const cls = [l.tipo, passada?"past":"", l===proxima?"is-next":"", painel?.date===l.data?"com-pres":""].join(" ");
       const titulo = l.link ? `<a href="${esc(l.link)}" target="_blank" rel="noopener">${esc(l.titulo)}</a>` : esc(l.titulo);
       const tag = l.tipo === "reuniao" ? `<br><span class="tag">Reunião de equipa · para todos</span>` : "";
       const abrir = l.link ? `<a class="open" href="${esc(l.link)}" target="_blank" rel="noopener">Abrir lição</a>` : "";
@@ -651,13 +669,13 @@ function lerToken(){
   } catch { token = t; }
 }
 
-async function api(metodo, caminho, corpo){
+async function api(metodo, caminho, corpo, funcao = "ebd-signup"){
   const headers = { "Content-Type": "application/json" };
   const ms = await tokenMicrosoft(), g = tokenGoogle();
   if (ms) headers["x-ms-token"] = ms;
   else if (g) headers["x-google-token"] = g;
   else if (token) headers["x-access-token"] = token;
-  const r = await fetch(API + "/ebd-signup" + caminho, {
+  const r = await fetch(API + "/" + funcao + caminho, {
     method: metodo,
     headers,
     body: corpo ? JSON.stringify(corpo) : undefined,
@@ -682,6 +700,7 @@ async function carregarEscala(){
     }
     aviso = e.status === 401 || e.status === 403 ? "Este link de acesso já não é válido. Abre https://ebd.iel.pt sem nada a seguir." : e.message;
   }
+  await carregarContagens();
   render();
   contaHtml();
 }
@@ -718,13 +737,96 @@ function escalaHtml(l, passada){
       ? `<button class="slot" data-acao="entrar" data-d="${l.data}" data-c="${c.id}" aria-label="Escalar-me na ${esc(c.name)}">+ escalar-me</button>` : "";
     const vazia = !pessoas.length && passada ? `<span class="vazia">—</span>` : "";
     return `<div class="classe"><span class="nome">${esc(c.name)}</span>${nomes}${entrar}${vazia}</div>`;
-  }).join("") + `</div>`;
+  }).join("") + `</div>` + presencasHtml(l);
 }
+
+// ---- Presenças (só equipa da EBD com login) --------------------------------
+let contagens = {};      // { data: { classId: n } }
+let painel = null;       // presenças da lição aberta: { date, classes, children, present:Set }
+
+function podePresencas(){
+  if (!escala || !(msConta || tokenGoogle())) return false;
+  return Boolean(escala.can_manage || escala.members.some(m => m.id === escala.me));
+}
+
+function presencasHtml(l){
+  if (!podePresencas() || parse(l.data) > hoje) return "";
+  if (!painel || painel.date !== l.data) {
+    const n = Object.values(contagens[l.data] || {}).reduce((a, b) => a + b, 0);
+    return `<button class="pres-btn" data-acao="pres" data-d="${l.data}">${n ? `Presenças · ${n}` : "Registar presenças"}</button>`;
+  }
+  return `<div class="pres">` + painel.classes.map(c => {
+    const kids = painel.children.filter(k => k.ebd_class_id === c.id);
+    const n = kids.filter(k => painel.present.has(k.id)).length;
+    const lista = kids.length
+      ? kids.map(k => `<label><input type="checkbox" data-child="${k.id}" ${painel.present.has(k.id) ? "checked" : ""}>${esc(k.full_name)}</label>`).join("")
+      : `<span class="vazio">Ainda não há crianças nesta classe.</span>`;
+    return `<fieldset><legend>${esc(c.name)} <small>· ${n} presente${n === 1 ? "" : "s"}</small></legend>
+      <div class="criancas">${lista}</div>
+      <form class="nova" data-c="${c.id}"><input name="nome" placeholder="Criança nova" autocomplete="off" aria-label="Nome da criança nova na ${esc(c.name)}"><button>Acrescentar</button></form>
+    </fieldset>`;
+  }).join("") + `<div class="acoes"><button class="principal" data-acao="guardar-pres">Guardar presenças</button><button data-acao="fechar-pres">Fechar</button></div></div>`;
+}
+
+async function carregarContagens(){
+  if (!podePresencas()) { contagens = {}; return; }
+  try { contagens = (await api("GET", `?from=${LICOES[0].data}&to=${LICOES[LICOES.length-1].data}`, null, "ebd-attendance")).counts; }
+  catch { contagens = {}; }
+}
+
+async function abrirPresencas(data){
+  const d = await api("GET", `?date=${data}`, null, "ebd-attendance");
+  painel = { date: d.date, classes: d.classes, children: d.children, present: new Set(d.present) };
+}
+
+document.getElementById("list").addEventListener("change", e => {
+  const box = e.target.closest("input[data-child]");
+  if (!box || !painel) return;
+  box.checked ? painel.present.add(box.dataset.child) : painel.present.delete(box.dataset.child);
+  const fs = box.closest("fieldset"), n = fs.querySelectorAll("input[data-child]:checked").length;
+  fs.querySelector("legend small").textContent = `· ${n} presente${n === 1 ? "" : "s"}`;
+});
+
+document.getElementById("list").addEventListener("submit", async e => {
+  const form = e.target.closest("form.nova");
+  if (!form || !painel) return;
+  e.preventDefault();
+  const nome = form.nome.value.trim();
+  if (!nome) return;
+  aviso = "";
+  try {
+    const k = await api("POST", "/children", { full_name: nome, class_id: form.dataset.c }, "ebd-attendance");
+    painel.children.push(k);
+    painel.children.sort((a, b) => a.full_name.localeCompare(b.full_name, "pt"));
+    painel.present.add(k.id);   // quem se acrescenta no dia, veio
+  } catch (err) { aviso = err.message; }
+  render();
+  document.querySelector(`form.nova[data-c="${form.dataset.c}"] input`)?.focus();
+});
 
 document.getElementById("list").addEventListener("click", async e => {
   const b = e.target.closest("button[data-acao]");
   if (!b) return;
   aviso = "";
+  if (b.dataset.acao === "pres" || b.dataset.acao === "fechar-pres" || b.dataset.acao === "guardar-pres") {
+    e.preventDefault();
+    b.disabled = true;
+    try {
+      if (b.dataset.acao === "pres") await abrirPresencas(b.dataset.d);
+      else if (b.dataset.acao === "fechar-pres") painel = null;
+      else {
+        for (const c of painel.classes) {
+          const present = painel.children.filter(k => k.ebd_class_id === c.id && painel.present.has(k.id)).map(k => k.id);
+          await api("PUT", "", { date: painel.date, class_id: c.id, present }, "ebd-attendance");
+        }
+        painel = null;
+        aviso = "Presenças guardadas.";
+        await carregarContagens();
+      }
+    } catch (err) { aviso = err.message; }
+    render();
+    return;
+  }
   if (b.dataset.acao === "entrar" && !eu) {
     aviso = "Escolhe primeiro o teu nome."; render();
     document.getElementById("eu").focus();
