@@ -705,6 +705,9 @@ document.getElementById("list").addEventListener("click", async e => {
   await carregarEscala();   // mostra sempre o que ficou realmente guardado
 });
 
+// Colar o link numa página já aberta só muda o "#": tratar como uma abertura nova.
+addEventListener("hashchange", () => { if (location.hash.includes("t=")) { lerToken(); carregarEscala(); } });
+
 lerToken();
 render();
 carregarEscala();
