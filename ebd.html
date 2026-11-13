@@ -3,6 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
 <title>EBD – Calendário de Lições</title>
 <style>
   :root{
@@ -564,8 +565,8 @@ const LICOES = [
 ];
 
 // Escalas: ficam guardadas na base de dados da app.iel.pt (uma pessoa por classe).
-// Só aparecem a quem abre a página com o link de acesso da EBD (…/#t=<token>);
-// sem link, a página mostra apenas o calendário.
+// A página é aberta (sem login) por decisão do Presbitério; um link de acesso
+// (…/#t=<token>) continua a ser aceite, mas não é preciso.
 const API = "https://dyibamiqszcnicdaukvg.supabase.co/functions/v1";
 
 const MESES = ["Janeiro","Fevereiro","Março","Abril","Maio","Junho","Julho","Agosto","Setembro","Outubro","Novembro","Dezembro"];
@@ -636,7 +637,7 @@ function lerToken(){
 async function api(metodo, caminho, corpo){
   const r = await fetch(API + "/ebd-signup" + caminho, {
     method: metodo,
-    headers: { "Content-Type": "application/json", "x-access-token": token },
+    headers: { "Content-Type": "application/json", ...(token ? { "x-access-token": token } : {}) },
     body: corpo ? JSON.stringify(corpo) : undefined,
   });
   const dados = await r.json().catch(() => ({}));
@@ -645,14 +646,13 @@ async function api(metodo, caminho, corpo){
 }
 
 async function carregarEscala(){
-  if (!token) return;
   try {
     escala = await api("GET", `?from=${LICOES[0].data}&to=${LICOES[LICOES.length-1].data}`);
     if (escala.me) eu = escala.me;
     if (!escala.members.some(m => m.id === eu)) eu = null;
   } catch (e) {
     escala = null;
-    aviso = e.status === 401 || e.status === 403 ? "Este link não dá acesso às escalas da EBD." : e.message;
+    aviso = e.status === 401 || e.status === 403 ? "Este link de acesso já não é válido. Abre https://ebd.iel.pt sem nada a seguir." : e.message;
   }
   render();
 }

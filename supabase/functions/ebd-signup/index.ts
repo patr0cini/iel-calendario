@@ -6,16 +6,20 @@
 // Writes land in ebd_assignments, the same table the order of service reads,
 // so a sign-up here shows up in app.iel.pt straight away.
 //
-// Who may do what (admin or the EBD ministry only):
+// Who may do what:
+//   - No credentials (ebd.iel.pt is open, decided by the Presbitério on
+//     2026-11-13 until Microsoft sign-in comes): acts as the EBD ministry, but
+//     ONLY inside this function — pick a name from the EBD members; a taken
+//     class can only be freed by naming who holds it. Nothing else in the API
+//     opens up: every other function still requires a token.
 //   - Microsoft sign-in: you sign yourself up / remove yourself.
-//   - EBD link (shared by the team, carries no person): pick a name from the
-//     EBD members; a taken class can only be freed by naming who holds it.
+//   - EBD link: same as no credentials.
 //   - Admin and EBD leaders may also replace or remove anyone.
 
 import type { SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 import { serviceClient } from "../_shared/supabase.ts";
-import { requireIdentity, type Identity } from "../_shared/identity.ts";
+import { resolveIdentity, type Identity } from "../_shared/identity.ts";
 import { assertMinistryWrite } from "../_shared/authz.ts";
 import { enforceRateLimit } from "../_shared/ratelimit.ts";
 import { writeAudit } from "../_shared/audit.ts";
@@ -47,6 +51,20 @@ async function ebdMembers(db: SupabaseClient, ebdId: string): Promise<Member[]> 
     .sort((a, b) => a.full_name.localeCompare(b.full_name, "pt"));
 }
 
+/** The anonymous visitor of ebd.iel.pt — EBD ministry powers, this function only. */
+function publicIdentity(req: Request, ebdId: string): Identity {
+  const ip = (req.headers.get("x-forwarded-for") ?? "").split(",")[0].trim() || "unknown";
+  return {
+    tokenId: null,
+    rateKey: `ebd-public:${ip}`,
+    ministryId: ebdId,
+    ministryIds: [ebdId],
+    scope: "ministry",
+    personId: null,
+    displayName: "ebd.iel.pt (público)",
+  };
+}
+
 function canManage(identity: Identity, members: Member[]): boolean {
   if (identity.scope === "admin") return true;
   return identity.personId !== null && members.some((m) => m.id === identity.personId && m.is_leader);
@@ -68,10 +86,10 @@ async function activeClass(db: SupabaseClient, classId: string): Promise<void> {
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return preflight(req);
   try {
-    const identity = await requireIdentity(req);
-    enforceRateLimit(identity.rateKey);
     const db = serviceClient();
     const ebdId = await ministryIdBySlug(db, "ebd");
+    const identity = (await resolveIdentity(req)) ?? publicIdentity(req, ebdId);
+    enforceRateLimit(identity.rateKey);
     assertMinistryWrite(identity, ebdId);
     const members = await ebdMembers(db, ebdId);
     const manager = canManage(identity, members);
