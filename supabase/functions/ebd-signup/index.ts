@@ -1,6 +1,6 @@
 // /ebd-signup — self sign-up for Sunday School lessons (used by ebd.iel.pt).
 //   GET    ?from=YYYY-MM-DD&to=YYYY-MM-DD -> classes, EBD members and who is on each Sunday
-//   POST   { date, class_id, person_id }  -> take a class (one teacher per class)
+//   POST   { date, class_id, person_id }  -> join a class (several teachers per class)
 //   DELETE ?date=&class=&person=          -> leave a class
 //
 // Writes land in ebd_assignments, the same table the order of service reads,
@@ -9,12 +9,12 @@
 // Who may do what:
 //   - No credentials (ebd.iel.pt is open, decided by the Presbitério on
 //     2026-11-13 until Microsoft sign-in comes): acts as the EBD ministry, but
-//     ONLY inside this function — pick a name from the EBD members; a taken
-//     class can only be freed by naming who holds it. Nothing else in the API
+//     ONLY inside this function — pick a name from the EBD members; removing
+//     someone means naming them. Nothing else in the API
 //     opens up: every other function still requires a token.
 //   - Microsoft sign-in: you sign yourself up / remove yourself.
 //   - EBD link: same as no credentials.
-//   - Admin and EBD leaders may also replace or remove anyone.
+//   - Admin and EBD leaders may add or remove anyone.
 
 import type { SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2";
 
@@ -117,8 +117,8 @@ Deno.serve(async (req) => {
         : { data: [], error: null };
       if (error) throw new HttpError(500, error.message);
 
-      // { "2026-11-15": { "<classId>": { person_id, name } } } — first person wins.
-      const lessons: Record<string, Record<string, { person_id: string; name: string }>> = {};
+      // { "2026-11-15": { "<classId>": [{ person_id, name }, …] } } in sign-up order.
+      const lessons: Record<string, Record<string, { person_id: string; name: string }[]>> = {};
       for (const a of (assignments ?? []) as unknown as {
         service_id: string;
         ebd_class_id: string;
@@ -127,8 +127,10 @@ Deno.serve(async (req) => {
       }[]) {
         const date = dateById.get(a.service_id);
         if (!date) continue;
-        const day = (lessons[date] ??= {});
-        day[a.ebd_class_id] ??= { person_id: a.person_id, name: a.people?.full_name ?? "—" };
+        const people = ((lessons[date] ??= {})[a.ebd_class_id] ??= []);
+        if (!people.some((p) => p.person_id === a.person_id)) {
+          people.push({ person_id: a.person_id, name: a.people?.full_name ?? "—" });
+        }
       }
 
       return jsonResponse(req, 200, {
@@ -154,14 +156,13 @@ Deno.serve(async (req) => {
       const serviceId = await serviceOn(db, body.date);
       await activeClass(db, body.class_id);
 
-      const { data, error } = await db.rpc("ebd_claim_slot", {
+      const { data, error } = await db.rpc("ebd_join_class", {
         p_service: serviceId,
         p_class: body.class_id,
         p_person: body.person_id,
-        p_replace: manager,
       });
       if (error) throw new HttpError(400, error.message);
-      if (data === "taken") throw new HttpError(409, "Esta classe já tem alguém escalado.");
+      if (data === "already") return jsonResponse(req, 200, { ok: true });
 
       await writeAudit(db, identity, {
         action: "update",
@@ -183,8 +184,7 @@ Deno.serve(async (req) => {
       }
       const serviceId = await serviceOn(db, date);
 
-      // Naming the holder is what frees the slot: a stale page cannot remove
-      // someone who signed up in the meantime.
+      // Removal names the person, so a stale page never removes someone else.
       const { data: removed, error } = await db
         .from("ebd_assignments")
         .delete()

@@ -48,7 +48,10 @@
   li.evento{background:var(--event)}
   li.past{opacity:.45}
   li.is-next{box-shadow:inset 4px 0 0 var(--accent)}
-  .escala{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px}
+  .escala{display:grid;gap:5px;margin-top:7px}
+  .classe{display:flex;flex-wrap:wrap;align-items:center;gap:4px 6px;font-size:.8rem}
+  .classe>.nome{flex:0 0 4.7em;font-weight:600;color:var(--muted)}
+  .classe>.vazia{color:var(--muted)}
   .slot{display:inline-flex;align-items:center;gap:6px;font:inherit;font-size:.8rem;padding:3px 10px;border-radius:999px;border:1px solid var(--line);background:var(--bg);color:var(--muted)}
   .slot b{font-weight:600;color:var(--ink)}
   .slot.cheia{background:var(--accent-soft);border-color:transparent}
@@ -672,19 +675,23 @@ function quemHtml(){
   };
 }
 
-// As três classes de uma lição: quem está, ou o botão para se escalar.
+// As três classes de uma lição: uma linha por classe, com todas as pessoas
+// escaladas e o botão para se juntar (várias pessoas por classe).
 function escalaHtml(l, passada){
   if (!escala || l.tipo !== "licao") return "";
   const dia = escala.lessons[l.data] || {};
   return `<div class="escala">` + escala.classes.map(c => {
-    const s = dia[c.id];
-    if (s) {
+    const pessoas = dia[c.id] || [];
+    const nomes = pessoas.map(s => {
       const podeSair = !passada && (s.person_id === eu || escala.can_manage);
       const sair = podeSair ? `<button class="sair" data-acao="sair" data-d="${l.data}" data-c="${c.id}" data-p="${s.person_id}" aria-label="Retirar ${esc(s.name)} da ${esc(c.name)}" title="Retirar">×</button>` : "";
-      return `<span class="slot cheia ${s.person_id===eu?"minha":""}">${esc(c.name)} · <b>${esc(s.name)}</b>${sair}</span>`;
-    }
-    if (passada) return `<span class="slot">${esc(c.name)} · —</span>`;
-    return `<button class="slot" data-acao="entrar" data-d="${l.data}" data-c="${c.id}">${esc(c.name)} · escalar-me</button>`;
+      return `<span class="slot cheia ${s.person_id===eu?"minha":""}"><b>${esc(s.name)}</b>${sair}</span>`;
+    }).join("");
+    const jaLa = eu && pessoas.some(s => s.person_id === eu);
+    const entrar = !passada && !jaLa
+      ? `<button class="slot" data-acao="entrar" data-d="${l.data}" data-c="${c.id}" aria-label="Escalar-me na ${esc(c.name)}">+ escalar-me</button>` : "";
+    const vazia = !pessoas.length && passada ? `<span class="vazia">—</span>` : "";
+    return `<div class="classe"><span class="nome">${esc(c.name)}</span>${nomes}${entrar}${vazia}</div>`;
   }).join("") + `</div>`;
 }
 
