@@ -31,6 +31,16 @@ export default defineConfig({
       "@": path.resolve(__dirname, "src"),
     },
   },
+  build: {
+    rollupOptions: {
+      // ebd.html is a standalone static page (the Sunday School calendar),
+      // published next to the app until it moves to ebd.iel.pt.
+      input: {
+        main: path.resolve(__dirname, "index.html"),
+        ebd: path.resolve(__dirname, "ebd.html"),
+      },
+    },
+  },
   server: {
     port: 5173,
   },

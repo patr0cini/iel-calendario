@@ -168,3 +168,7 @@ verify_jwt = false
 enabled = true
 port = 54327
 backend = "postgres"
+
+[functions.ebd-signup]
+enabled = true
+verify_jwt = false

@@ -46,11 +46,9 @@ join (values
 ) as r (slug, name, sort_order) on r.slug = m.slug
 on conflict (ministry_id, name) do nothing;
 
--- Sunday School classes (per-class scheduling). Placeholder set; admin edits.
-insert into ebd_classes (name, age_range, sort_order) values
-  ('Berçário', '0-3', 1),
-  ('Infantil', '4-8', 2),
-  ('Juniores', '9-12', 3),
-  ('Adolescentes', '13-17', 4),
-  ('Adultos', '18+', 5)
+-- Sunday School classes: one teacher per class per lesson (see ebd.html).
+insert into ebd_classes (name, sort_order) values
+  ('Classe 1', 1),
+  ('Classe 2', 2),
+  ('Classe 3', 3)
 on conflict (name) do nothing;
