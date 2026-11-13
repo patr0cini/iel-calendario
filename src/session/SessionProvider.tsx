@@ -1,9 +1,10 @@
-import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
+import { createContext, useContext, useEffect, useReducer, useRef, useState, type ReactNode } from "react";
 import { useQuery } from "@tanstack/react-query";
 
 import { apiFetch } from "../lib/api";
 import { getToken } from "../lib/session";
 import { hasMicrosoftAccount, initMicrosoft, microsoftEnabled, signInMicrosoft, signOutMicrosoft } from "../lib/msal";
+import { googleEnabled, hasGoogleAccount, onGoogleChange, renderGoogleButton, renewGoogle, signOutGoogle } from "../lib/google";
 import type { AuthResolve, EventRow, Ministry, Scope } from "../lib/types";
 import { WaitingScreen } from "../components/WaitingScreen";
 
@@ -16,9 +17,10 @@ interface Session {
   permissions: string[];
   ministries: Ministry[];
   ministryById: Map<string, Ministry>;
-  /** Who is signed in via Microsoft, if anyone. */
+  /** Who is signed in (Microsoft or Google), if anyone. */
   personName: string | null;
   signedInWithMicrosoft: boolean;
+  signedInWithGoogle: boolean;
   canCreate: boolean;
   canEditEvent: (event: Pick<EventRow, "ministry_id">) => boolean;
 }
@@ -31,7 +33,7 @@ export function useSession(): Session {
   return ctx;
 }
 
-export { signOutMicrosoft };
+export { signOutMicrosoft, signOutGoogle };
 
 export function SessionProvider({ children }: { children: ReactNode }) {
   // MSAL must settle a redirect before we know whether we have an account.
@@ -41,12 +43,33 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     initMicrosoft().finally(() => setMsReady(true));
   }, []);
 
+  // Google signs in (and renews) outside React: re-render when it does.
+  const [, rerender] = useReducer((n: number) => n + 1, 0);
+  useEffect(() => {
+    if (!googleEnabled) return;
+    const off = onGoogleChange(rerender);
+    void renewGoogle();
+    return () => {
+      off();
+    };
+  }, []);
+
   const hasLink = getToken() !== null;
   const hasMicrosoft = msReady && hasMicrosoftAccount();
-  const hasIdentity = hasLink || hasMicrosoft;
+  const hasGoogle = hasGoogleAccount();
+  const hasIdentity = hasLink || hasMicrosoft || hasGoogle;
+  const signOutPersonal = hasMicrosoft
+    ? () => void signOutMicrosoft()
+    : hasGoogle
+      ? () => {
+          signOutGoogle();
+          window.location.reload();
+        }
+      : undefined;
 
   const auth = useQuery({
-    queryKey: ["auth", "resolve"],
+    // Keyed on the door, so switching accounts resolves again.
+    queryKey: ["auth", "resolve", hasMicrosoft ? "ms" : hasGoogle ? "google" : "link"],
     enabled: msReady && hasIdentity,
     retry: 3,
     retryDelay: (n) => Math.min(1000 * 2 ** n, 8000), // ride out a cold start
@@ -79,8 +102,8 @@ export function SessionProvider({ children }: { children: ReactNode }) {
           void auth.refetch();
           void ministries.refetch();
         }}
-        secondaryLabel={hasMicrosoft ? "Terminar sessão" : undefined}
-        onSecondary={hasMicrosoft ? () => void signOutMicrosoft() : undefined}
+        secondaryLabel={signOutPersonal ? "Terminar sessão" : undefined}
+        onSecondary={signOutPersonal}
       />
     );
   }
@@ -102,6 +125,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     ministryById: new Map(list.map((m) => [m.id, m])),
     personName: auth.data.person?.full_name ?? null,
     signedInWithMicrosoft: hasMicrosoft,
+    signedInWithGoogle: hasGoogle,
     canCreate: scope !== "readonly",
     canEditEvent: (event) =>
       scope === "admin" || (scope === "ministry" && ownMinistryIds.includes(event.ministry_id)),
@@ -119,7 +143,7 @@ function SignIn() {
         </span>
         <h1 className="text-lg font-semibold">Calendário IEL</h1>
         <p className="mt-2 text-sm text-zinc-500 dark:text-zinc-400">
-          Entra com a conta da Igreja, ou abre o link do teu ministério.
+          Entra com a conta da Igreja ou com a tua conta Google, ou abre o link do teu ministério.
         </p>
 
         {microsoftEnabled && (
@@ -133,11 +157,29 @@ function SignIn() {
           </button>
         )}
 
+        {googleEnabled && <GoogleButton />}
+
         <p className="mt-5 text-xs leading-relaxed text-zinc-400 dark:text-zinc-500">
-          Não tens conta Microsoft? Usa o link que o Presbitério te enviou — é pessoal, não o partilhes.
+          Com Google, usa o email que está na tua ficha (pede ao Presbitério para o acrescentar).
+          Sem conta? Usa o link que o Presbitério te enviou — não o partilhes.
         </p>
       </div>
     </div>
+  );
+}
+
+// Google's own button (their branding rules require it to be theirs).
+function GoogleButton() {
+  const ref = useRef<HTMLDivElement>(null);
+  const [error, setError] = useState<string | null>(null);
+  useEffect(() => {
+    if (ref.current) renderGoogleButton(ref.current).catch((e: Error) => setError(e.message));
+  }, []);
+  return (
+    <>
+      <div ref={ref} className="mt-3 flex min-h-[44px] w-full justify-center" />
+      {error && <p className="mt-2 text-xs text-red-600">{error}</p>}
+    </>
   );
 }
 

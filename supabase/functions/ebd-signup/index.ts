@@ -12,7 +12,8 @@
 //     ONLY inside this function — pick a name from the EBD members; removing
 //     someone means naming them. Nothing else in the API
 //     opens up: every other function still requires a token.
-//   - Microsoft sign-in: you sign yourself up / remove yourself.
+//   - Microsoft or Google sign-in (EBD member): you sign yourself up /
+//     remove yourself. Signed in but not in the EBD: same as no credentials.
 //   - EBD link: same as no credentials.
 //   - Admin and EBD leaders may add or remove anyone.
 
@@ -88,7 +89,13 @@ Deno.serve(async (req) => {
   try {
     const db = serviceClient();
     const ebdId = await ministryIdBySlug(db, "ebd");
-    const identity = (await resolveIdentity(req)) ?? publicIdentity(req, ebdId);
+    // Signed-in people without EBD rights (another ministry) still get the
+    // open sign-up, like any visitor.
+    const resolved = await resolveIdentity(req);
+    const identity =
+      resolved && (resolved.scope === "admin" || resolved.ministryIds.includes(ebdId))
+        ? resolved
+        : publicIdentity(req, ebdId);
     enforceRateLimit(identity.rateKey);
     assertMinistryWrite(identity, ebdId);
     const members = await ebdMembers(db, ebdId);
@@ -137,6 +144,8 @@ Deno.serve(async (req) => {
         classes: classes.data ?? [],
         members: members.map((m) => ({ id: m.id, full_name: m.full_name })),
         me: identity.personId,
+        // Who signed in (Microsoft/Google), even if they are not in the EBD.
+        signed_in_as: resolved?.personId ? resolved.displayName : null,
         can_manage: manager,
         lessons,
       });

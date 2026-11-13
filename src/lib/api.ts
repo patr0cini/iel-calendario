@@ -6,6 +6,7 @@
 
 import { getToken } from "./session";
 import { getMicrosoftToken, hasMicrosoftAccount } from "./msal";
+import { getGoogleToken } from "./google";
 
 const FUNCTIONS_URL = import.meta.env.VITE_FUNCTIONS_URL;
 
@@ -36,11 +37,14 @@ export async function apiFetch<T>(
   };
 
   if (auth) {
-    // A Microsoft sign-in wins over a ministry link when both are present.
+    // A personal sign-in (Microsoft, then Google) wins over a ministry link
+    // when several are present.
     if (hasMicrosoftAccount()) {
       const msToken = await getMicrosoftToken();
       if (msToken) headers["x-ms-token"] = msToken;
     }
+    const googleToken = getGoogleToken();
+    if (googleToken) headers["x-google-token"] = googleToken;
     const token = getToken();
     if (token) headers["x-access-token"] = token;
   }

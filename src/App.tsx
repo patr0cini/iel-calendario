@@ -1,6 +1,6 @@
 import { Routes, Route, Navigate, NavLink, Outlet } from "react-router-dom";
 
-import { SessionProvider, useSession, signOutMicrosoft } from "./session/SessionProvider";
+import { SessionProvider, useSession, signOutMicrosoft, signOutGoogle } from "./session/SessionProvider";
 import { clearSession } from "./lib/session";
 import { CalendarPage } from "./components/CalendarPage";
 import { ServicePage } from "./components/ServicePage";
@@ -11,9 +11,10 @@ import { VersionBadge } from "./components/VersionBadge";
 
 const SCOPE_LABEL = { admin: "Presbitério", ministry: "Ministério", readonly: "Leitura" } as const;
 
-/** Drops both doors: the ministry link token and the Microsoft session. */
+/** Drops every door: the ministry link, the Google and the Microsoft session. */
 async function signOut(withMicrosoft: boolean) {
   clearSession();
+  signOutGoogle();
   if (withMicrosoft) {
     await signOutMicrosoft(); // redirects away
     return;

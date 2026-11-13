@@ -63,6 +63,13 @@
   .quem{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin:8px 0 0;color:var(--muted);font-size:.9rem}
   .quem select{font:inherit;padding:6px 10px;border:1px solid var(--line);border-radius:8px;background:var(--card);color:var(--ink);max-width:100%}
   .aviso{margin:8px 0 0;font-size:.9rem;color:var(--event-ink)}
+  .conta{max-width:820px;margin:0 auto;padding:4px 20px 0;display:flex;flex-wrap:wrap;align-items:center;gap:8px 10px;color:var(--muted);font-size:.9rem}
+  .conta[hidden],.conta [hidden]{display:none!important}
+  .conta b{color:var(--ink)}
+  .conta .ms{display:inline-flex;align-items:center;gap:8px;height:40px;padding:0 14px;border:1px solid #dadce0;border-radius:4px;background:#fff;color:#3c4043;font:500 14px/1 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif;cursor:pointer}
+  .conta .ms:hover{background:#f7f8f8}
+  .conta .link{border:0;background:none;padding:0;font:inherit;color:var(--accent);text-decoration:underline;cursor:pointer}
+  #g-btn{min-height:40px}
   .hidden{display:none}
   footer{max-width:820px;margin:0 auto;padding:0 20px 32px;color:var(--muted);font-size:.85rem}
   footer a{color:var(--muted)}
@@ -79,6 +86,12 @@
   </div>
   <p class="missao">Conhecer a história bíblica da redenção e entender o evangelho através de uma equipa unida e motivada a chegar até cada criança e família.</p>
 </header>
+<div class="conta" id="conta" hidden>
+  <span id="c-txt"></span>
+  <button class="ms" id="ms-btn" type="button" hidden><svg width="16" height="16" viewBox="0 0 21 21" aria-hidden="true"><rect x="1" y="1" width="9" height="9" fill="#f25022"/><rect x="11" y="1" width="9" height="9" fill="#7fba00"/><rect x="1" y="11" width="9" height="9" fill="#00a4ef"/><rect x="11" y="11" width="9" height="9" fill="#ffb900"/></svg>Entrar com Microsoft</button>
+  <div id="g-btn" hidden></div>
+  <button class="link" id="sair" type="button" hidden>Sair</button>
+</div>
 <nav id="years"></nav>
 <main>
   <div id="quem"></div>
@@ -567,8 +580,9 @@ const LICOES = [
  }
 ];
 
-// Escalas: ficam guardadas na base de dados da app.iel.pt (uma pessoa por classe).
-// A página é aberta (sem login) por decisão do Presbitério; um link de acesso
+// Escalas: ficam guardadas na base de dados da app.iel.pt (várias pessoas por
+// classe). Ver e escalar não precisa de login (decisão do Presbitério); quem
+// entra com Microsoft ou Google fica logo com o seu nome. Um link de acesso
 // (…/#t=<token>) continua a ser aceite, mas não é preciso.
 const API = "https://dyibamiqszcnicdaukvg.supabase.co/functions/v1";
 
@@ -638,13 +652,18 @@ function lerToken(){
 }
 
 async function api(metodo, caminho, corpo){
+  const headers = { "Content-Type": "application/json" };
+  const ms = await tokenMicrosoft(), g = tokenGoogle();
+  if (ms) headers["x-ms-token"] = ms;
+  else if (g) headers["x-google-token"] = g;
+  else if (token) headers["x-access-token"] = token;
   const r = await fetch(API + "/ebd-signup" + caminho, {
     method: metodo,
-    headers: { "Content-Type": "application/json", ...(token ? { "x-access-token": token } : {}) },
+    headers,
     body: corpo ? JSON.stringify(corpo) : undefined,
   });
   const dados = await r.json().catch(() => ({}));
-  if (!r.ok) throw Object.assign(new Error(dados.error || "Não foi possível falar com o servidor."), { status: r.status });
+  if (!r.ok) throw Object.assign(new Error(dados.error || "Não foi possível falar com o servidor."), { status: r.status, pessoal: Boolean(ms || g) });
   return dados;
 }
 
@@ -655,9 +674,16 @@ async function carregarEscala(){
     if (!escala.members.some(m => m.id === eu)) eu = null;
   } catch (e) {
     escala = null;
+    if ((e.status === 401 || e.status === 403) && e.pessoal) {
+      // Conta não associada a ninguém, ou sessão expirada: continua sem login.
+      aviso = e.status === 403 ? e.message : "A sessão expirou. Entra outra vez.";
+      await sairLocal();
+      return carregarEscala();
+    }
     aviso = e.status === 401 || e.status === 403 ? "Este link de acesso já não é válido. Abre https://ebd.iel.pt sem nada a seguir." : e.message;
   }
   render();
+  contaHtml();
 }
 
 function quemHtml(){
@@ -712,12 +738,111 @@ document.getElementById("list").addEventListener("click", async e => {
   await carregarEscala();   // mostra sempre o que ficou realmente guardado
 });
 
+// ---- Entrar com Microsoft ou Google ----------------------------------------
+// Identificadores públicos (não são segredos). O servidor confirma cada token
+// junto da Microsoft/Google e reconhece a pessoa pelo email da sua ficha.
+const MS_CLIENT_ID = "9ef927b9-2b6f-459e-b003-5aea55470da1";
+const MS_TENANT_ID = "807668be-da22-4878-95a4-6c0f996e2c6a";
+const GOOGLE_CLIENT_ID = "266316669194-um6nljgok8il1mpc2mjb138jpl0s3nbs.apps.googleusercontent.com";
+const ESCOPOS = ["openid", "profile", "email"];
+
+let msApp = null, msConta = null;
+
+async function iniciarMicrosoft(){
+  try {
+    const { PublicClientApplication } = await import("https://cdn.jsdelivr.net/npm/@azure/msal-browser@5.17.0/+esm");
+    msApp = new PublicClientApplication({
+      auth: { clientId: MS_CLIENT_ID, authority: `https://login.microsoftonline.com/${MS_TENANT_ID}`, redirectUri: location.origin + location.pathname },
+      cache: { cacheLocation: "sessionStorage" },
+    });
+    await msApp.initialize();
+    await msApp.handleRedirectPromise();
+    msConta = msApp.getAllAccounts()[0] ?? null;
+  } catch (e) {
+    msApp = null; msConta = null;
+    console.warn("Microsoft:", e);
+  }
+}
+
+async function tokenMicrosoft(){
+  if (!msApp || !msConta) return null;
+  try { return (await msApp.acquireTokenSilent({ account: msConta, scopes: ESCOPOS })).idToken || null; }
+  catch { return null; }
+}
+
+function expira(jwt){
+  try { return JSON.parse(atob(jwt.split(".")[1].replace(/-/g,"+").replace(/_/g,"/"))).exp * 1000; } catch { return 0; }
+}
+function tokenGoogle(){
+  let t = null;
+  try { t = sessionStorage.getItem("ebd.google"); } catch {}
+  return t && expira(t) - Date.now() > 60000 ? t : null;
+}
+
+function iniciarGoogle(){
+  if (!GOOGLE_CLIENT_ID) return Promise.resolve();
+  return new Promise(ok => {
+    const s = document.createElement("script");
+    s.src = "https://accounts.google.com/gsi/client"; s.async = true;
+    s.onerror = () => ok();
+    s.onload = () => {
+      google.accounts.id.initialize({
+        client_id: GOOGLE_CLIENT_ID,
+        auto_select: true,
+        use_fedcm_for_prompt: true,
+        callback: r => {
+          try { sessionStorage.setItem("ebd.google", r.credential); localStorage.setItem("ebd.google.usado", "1"); } catch {}
+          aviso = ""; carregarEscala();
+        },
+      });
+      google.accounts.id.renderButton(document.getElementById("g-btn"), { theme: "outline", size: "large", text: "signin_with", locale: "pt-PT" });
+      let usado = false; try { usado = localStorage.getItem("ebd.google.usado") === "1"; } catch {}
+      if (usado && !tokenGoogle() && !msConta) google.accounts.id.prompt();   // renova sem pedir nada
+      ok();
+    };
+    document.head.appendChild(s);
+  });
+}
+
+async function sairLocal(){
+  try { sessionStorage.removeItem("ebd.google"); localStorage.removeItem("ebd.google.usado"); } catch {}
+  window.google?.accounts?.id?.disableAutoSelect();
+  if (msApp && msConta) {
+    // Esquece a conta nesta página sem terminar a sessão Microsoft do browser.
+    await msApp.logoutRedirect({ account: msConta, onRedirectNavigate: () => false }).catch(() => {});
+    msConta = null;
+  }
+}
+
+function contaHtml(){
+  const conta = document.getElementById("conta");
+  const pessoal = Boolean(msConta || tokenGoogle());
+  const quem = escala?.signed_in_as;
+  conta.hidden = false;
+  document.getElementById("c-txt").innerHTML = pessoal && quem
+    ? `Entraste como <b>${esc(quem)}</b>` + (escala.me && escala.members.some(m => m.id === escala.me) ? "" : " (não és membro da EBD)") + " ·"
+    : "Entra para te escalares com o teu nome:";
+  document.getElementById("ms-btn").hidden = pessoal || !msApp;
+  document.getElementById("g-btn").hidden = pessoal || !GOOGLE_CLIENT_ID;
+  document.getElementById("sair").hidden = !pessoal;
+}
+
+document.getElementById("ms-btn").onclick = () => msApp?.loginRedirect({ scopes: ESCOPOS, prompt: "select_account" });
+document.getElementById("sair").onclick = async () => {
+  await sairLocal();
+  eu = null; try { localStorage.removeItem("ebd.eu"); } catch {}
+  await carregarEscala();
+};
+
 // Colar o link numa página já aberta só muda o "#": tratar como uma abertura nova.
-addEventListener("hashchange", () => { if (location.hash.includes("t=")) { lerToken(); carregarEscala(); } });
+addEventListener("hashchange", () => { if (new URLSearchParams(location.hash.slice(1)).has("t")) { lerToken(); carregarEscala(); } });
 
 lerToken();
 render();
-carregarEscala();
+(async () => {
+  await Promise.all([iniciarMicrosoft(), iniciarGoogle()]);
+  await carregarEscala();
+})();
 </script>
 </body>
 </html>
