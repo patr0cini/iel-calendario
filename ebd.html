@@ -87,6 +87,30 @@
   .pres .acoes{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
   .pres .acoes .principal{background:var(--accent);color:#fff}
   .pres .vazio{color:var(--muted);font-size:.85rem}
+  .tabs{max-width:820px;margin:0 auto;padding:10px 20px 0;display:flex;gap:6px}
+  .tabs[hidden],[hidden]{display:none!important}
+  .tabs button{border:0;border-bottom:3px solid transparent;background:none;font:inherit;font-weight:600;color:var(--muted);padding:6px 4px;margin-right:12px;cursor:pointer}
+  .tabs button[aria-pressed="true"]{color:var(--ink);border-bottom-color:var(--pink)}
+  .anos{display:flex;flex-wrap:wrap;gap:4px 10px;margin-top:5px;font-size:.82rem;color:var(--event-ink)}
+  .topo-alunos{display:flex;align-items:center;justify-content:space-between;gap:10px;margin:8px 0}
+  .topo-alunos h2{margin:0}
+  #alunos details{margin:14px 0}
+  #alunos summary{cursor:pointer;font-size:.85rem;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);font-weight:600}
+  .lista-alunos li{justify-content:space-between;flex-wrap:wrap}
+  .lista-alunos li.aberto{display:block}
+  .aluno{border:0;background:none;font:inherit;text-align:left;cursor:pointer;padding:4px 0;color:var(--ink);flex:1 1 200px}
+  .aluno small{color:var(--muted)} .aluno .nota{color:var(--pink)}
+  .classe-rapida,.ficha input,.ficha select,.ficha textarea{font:inherit;font-size:.9rem;padding:6px 9px;border:1px solid var(--line);border-radius:8px;background:var(--card);color:var(--ink);max-width:100%}
+  .ficha{display:grid;gap:10px}
+  .ficha label{display:grid;gap:4px;font-size:.82rem;color:var(--muted);font-weight:600}
+  .ficha label.check{display:flex;align-items:center;gap:8px;font-weight:400;color:var(--ink)}
+  .ficha .dois{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+  .ficha .acoes{display:flex;gap:8px;flex-wrap:wrap}
+  .ficha .acoes button{font:inherit;font-size:.85rem;padding:6px 14px;border-radius:8px;border:1px solid var(--accent);background:var(--card);color:var(--accent);cursor:pointer}
+  .ficha .acoes .principal{background:var(--accent);color:#fff}
+  .ficha .acoes .discreto{border-color:var(--line);color:var(--muted);margin-left:auto}
+  .nova-ficha{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:14px 16px}
+  @media (max-width:520px){ .ficha .dois{grid-template-columns:1fr} }
   .hidden{display:none}
   footer{max-width:820px;margin:0 auto;padding:0 20px 32px;color:var(--muted);font-size:.85rem}
   footer a{color:var(--muted)}
@@ -109,11 +133,16 @@
   <div id="g-btn" hidden></div>
   <button class="link" id="sair" type="button" hidden>Sair</button>
 </div>
+<div class="tabs" id="tabs" hidden role="group" aria-label="Secções">
+  <button type="button" data-vista="calendario" aria-pressed="true">Calendário</button>
+  <button type="button" data-vista="alunos" aria-pressed="false">Alunos</button>
+</div>
 <nav id="years"></nav>
 <main>
   <div id="quem"></div>
   <div id="next"></div>
   <div id="list"></div>
+  <div id="alunos" hidden></div>
 </main>
 <footer>Lições de <a href="https://truewaykids.com/pt/" target="_blank" rel="noopener">Trueway Kids</a>.</footer>
 
@@ -624,6 +653,8 @@ function nav(){
 }
 
 function render(){
+  separadores();
+  if (vista === "alunos") return alunosHtml();
   nav();
   quemHtml();
   const n = document.getElementById("next");
@@ -644,7 +675,7 @@ function render(){
       const tag = l.tipo === "reuniao" ? `<br><span class="tag">Reunião de equipa · para todos</span>` : "";
       const abrir = l.link ? `<a class="open" href="${esc(l.link)}" target="_blank" rel="noopener">Abrir lição</a>` : "";
       return `<li class="${cls}"><div class="date"><div class="d">${d.getDate()}</div><div class="w">${DIAS[d.getDay()]}</div></div>
-        <div class="title">${titulo}${tag}${escalaHtml(l, passada)}</div>${abrir}</li>`;
+        <div class="title">${titulo}${tag}${aniversariosHtml(l)}${escalaHtml(l, passada)}</div>${abrir}</li>`;
     }).join("");
     if (linhas) html += `<h2>${MESES[m-1]}</h2><ol>${linhas}</ol>`;
   }
@@ -701,6 +732,7 @@ async function carregarEscala(){
     aviso = e.status === 401 || e.status === 403 ? "Este link de acesso já não é válido. Abre https://ebd.iel.pt sem nada a seguir." : e.message;
   }
   await carregarContagens();
+  if (podePresencas()) await carregarAlunos(); else alunos = null;
   render();
   contaHtml();
 }
@@ -763,7 +795,7 @@ function presencasHtml(l){
       : `<span class="vazio">Ainda não há crianças nesta classe.</span>`;
     return `<fieldset><legend>${esc(c.name)} <small>· ${n} presente${n === 1 ? "" : "s"}</small></legend>
       <div class="criancas">${lista}</div>
-      <form class="nova" data-c="${c.id}"><input name="nome" placeholder="Criança nova" autocomplete="off" aria-label="Nome da criança nova na ${esc(c.name)}"><button>Acrescentar</button></form>
+      <form class="nova" data-c="${c.id}"><input name="nome" placeholder="Nome da criança" autocomplete="off" aria-label="Nome de uma criança nova na ${esc(c.name)}"><button value="aluno">+ Aluno novo</button><button value="visitante" title="Só fica nesta lição">+ Visitante</button></form>
     </fieldset>`;
   }).join("") + `<div class="acoes"><button class="principal" data-acao="guardar-pres">Guardar presenças</button><button data-acao="fechar-pres">Fechar</button></div></div>`;
 }
@@ -793,9 +825,12 @@ document.getElementById("list").addEventListener("submit", async e => {
   e.preventDefault();
   const nome = form.nome.value.trim();
   if (!nome) return;
+  const visitante = e.submitter?.value === "visitante";
   aviso = "";
   try {
-    const k = await api("POST", "/children", { full_name: nome, class_id: form.dataset.c }, "ebd-attendance");
+    const k = await api("POST", "/children", visitante
+      ? { full_name: nome, class_id: form.dataset.c, visitor: true, date: painel.date }
+      : { full_name: nome, class_id: form.dataset.c }, "ebd-attendance");
     painel.children.push(k);
     painel.children.sort((a, b) => a.full_name.localeCompare(b.full_name, "pt"));
     painel.present.add(k.id);   // quem se acrescenta no dia, veio
@@ -839,6 +874,155 @@ document.getElementById("list").addEventListener("click", async e => {
   } catch (err) { aviso = err.message; }
   await carregarEscala();   // mostra sempre o que ficou realmente guardado
 });
+
+// ---- Alunos (separador da equipa da EBD) -----------------------------------
+let vista = "calendario";   // "calendario" | "alunos"
+let alunos = null;          // fichas vindas do servidor
+let fichaAberta = null;     // id do aluno aberto, ou "novo"
+
+function idade(iso){
+  if (!iso) return null;
+  const [y, m, d] = iso.split("-").map(Number);
+  let a = hoje.getFullYear() - y;
+  if (hoje.getMonth() + 1 < m || (hoje.getMonth() + 1 === m && hoje.getDate() < d)) a--;
+  return a;
+}
+
+function separadores(){
+  const el = document.getElementById("tabs");
+  const pode = podePresencas();
+  el.hidden = !pode;
+  if (!pode && vista !== "calendario") vista = "calendario";
+  el.querySelectorAll("button").forEach(b => b.setAttribute("aria-pressed", String(b.dataset.vista === vista)));
+  const noCal = vista === "calendario";
+  for (const id of ["years", "quem", "next", "list"]) document.getElementById(id).hidden = !noCal;
+  document.getElementById("alunos").hidden = noCal;
+}
+
+async function carregarAlunos(){
+  try { alunos = await api("GET", "/children", null, "ebd-attendance"); }
+  catch (e) { alunos = []; aviso = e.message; }
+}
+
+function opcoesClasse(sel){
+  return `<option value="">— sem classe —</option>` + (escala?.classes || [])
+    .map(c => `<option value="${c.id}" ${c.id === sel ? "selected" : ""}>${esc(c.name)}</option>`).join("");
+}
+
+function fichaHtml(a){
+  const v = k => esc(a?.[k] ?? "");
+  const novo = !a;
+  return `<form class="ficha" data-id="${novo ? "novo" : a.id}">
+    <label>Nome<input name="full_name" required maxlength="80" value="${v("full_name")}"></label>
+    <div class="dois">
+      <label>Data de nascimento<input name="birth_date" type="date" value="${v("birth_date")}"></label>
+      <label>Classe<select name="class_id">${opcoesClasse(a?.ebd_class_id)}</select></label>
+    </div>
+    <label>Pais / encarregados de educação<textarea name="guardians" rows="2" maxlength="500" placeholder="Mãe - …&#10;Pai - …">${v("guardians")}</textarea></label>
+    <label>Contactos<textarea name="contacts" rows="2" maxlength="800" placeholder="Telemóveis e emails">${v("contacts")}</textarea></label>
+    <label>Notas (alergias, cuidados, autorizações…)<textarea name="notes" rows="2" maxlength="1000">${v("notes")}</textarea></label>
+    <label class="check"><input type="checkbox" name="visitor" ${a?.visitor ? "checked" : ""}> Visitante (não aparece nas presenças futuras)</label>
+    <div class="acoes">
+      <button class="principal">${novo ? "Criar aluno" : "Guardar"}</button>
+      <button type="button" data-acao="fechar-ficha">Cancelar</button>
+      ${novo ? "" : `<button type="button" data-acao="esconder" data-id="${a.id}" class="discreto">${a.active ? "Esconder da lista" : "Voltar a mostrar"}</button>`}
+    </div>
+  </form>`;
+}
+
+function alunosHtml(){
+  const el = document.getElementById("alunos");
+  if (!alunos) { el.innerHTML = `<p class="sub">A carregar…</p>`; return; }
+  const linha = a => {
+    const i = idade(a.birth_date);
+    if (fichaAberta === a.id) return `<li class="aberto">${fichaHtml(a)}</li>`;
+    return `<li><button class="aluno" data-acao="abrir-ficha" data-id="${a.id}"><b>${esc(a.full_name)}</b>${i !== null ? ` <small>${i} anos</small>` : ""}${a.notes ? ` <small class="nota" title="Tem notas">●</small>` : ""}</button>
+      <select class="classe-rapida" data-id="${a.id}" aria-label="Classe de ${esc(a.full_name)}">${opcoesClasse(a.ebd_class_id)}</select></li>`;
+  };
+  const grupo = (titulo, lista, aberto = true) => lista.length
+    ? `<details ${aberto ? "open" : ""}><summary>${esc(titulo)} <small>· ${lista.length}</small></summary><ol class="lista-alunos">${lista.map(linha).join("")}</ol></details>` : "";
+  const normais = alunos.filter(a => a.active && !a.visitor);
+  el.innerHTML = `<div class="topo-alunos"><h2>Alunos</h2><button class="pres-btn" data-acao="novo-aluno">+ Novo aluno</button></div>`
+    + (aviso ? `<p class="aviso">${esc(aviso)}</p>` : "")
+    + (fichaAberta === "novo" ? `<div class="nova-ficha">${fichaHtml(null)}</div>` : "")
+    + (escala?.classes || []).map(c => grupo(c.name, normais.filter(a => a.ebd_class_id === c.id))).join("")
+    + grupo("Sem classe", normais.filter(a => !a.ebd_class_id))
+    + grupo("Visitantes", alunos.filter(a => a.visitor && a.active), false)
+    + grupo("Escondidos", alunos.filter(a => !a.active), false)
+    + (alunos.length ? "" : `<p class="sub">Ainda não há alunos.</p>`);
+}
+
+document.getElementById("tabs").addEventListener("click", async e => {
+  const b = e.target.closest("button[data-vista]");
+  if (!b) return;
+  vista = b.dataset.vista; aviso = ""; fichaAberta = null;
+  if (vista === "alunos") { render(); await carregarAlunos(); }
+  render();
+});
+
+document.getElementById("alunos").addEventListener("click", async e => {
+  const b = e.target.closest("button[data-acao]");
+  if (!b) return;
+  aviso = "";
+  if (b.dataset.acao === "novo-aluno") fichaAberta = "novo";
+  else if (b.dataset.acao === "abrir-ficha") fichaAberta = b.dataset.id;
+  else if (b.dataset.acao === "fechar-ficha") fichaAberta = null;
+  else if (b.dataset.acao === "esconder") {
+    const a = alunos.find(x => x.id === b.dataset.id);
+    try { await api("PATCH", `/children/${a.id}`, { active: !a.active }, "ebd-attendance"); fichaAberta = null; await carregarAlunos(); }
+    catch (err) { aviso = err.message; }
+  }
+  render();
+});
+
+document.getElementById("alunos").addEventListener("change", async e => {
+  const sel = e.target.closest("select.classe-rapida");
+  if (!sel) return;
+  aviso = "";
+  try { await api("PATCH", `/children/${sel.dataset.id}`, { class_id: sel.value || null }, "ebd-attendance"); await carregarAlunos(); }
+  catch (err) { aviso = err.message; }
+  render();
+});
+
+document.getElementById("alunos").addEventListener("submit", async e => {
+  const f = e.target.closest("form.ficha");
+  if (!f) return;
+  e.preventDefault();
+  const dados = {
+    full_name: f.full_name.value, birth_date: f.birth_date.value || null, class_id: f.class_id.value || null,
+    guardians: f.guardians.value, contacts: f.contacts.value, notes: f.notes.value, visitor: f.visitor.checked,
+  };
+  aviso = "";
+  try {
+    if (f.dataset.id === "novo") await api("POST", "/children", dados, "ebd-attendance");
+    else await api("PATCH", `/children/${f.dataset.id}`, dados, "ebd-attendance");
+    fichaAberta = null;
+    await carregarAlunos();
+  } catch (err) { aviso = err.message; }
+  render();
+});
+
+// Aniversários da semana que termina neste domingo (segunda a domingo).
+function aniversariosHtml(l){
+  if (!podePresencas() || !alunos) return "";
+  const dom = parse(l.data);
+  if (dom.getDay() !== 0) return "";
+  const inicio = new Date(dom); inicio.setDate(dom.getDate() - 6);
+  const quem = [];
+  for (const a of alunos) {
+    if (!a.birth_date || !a.active || a.visitor) continue;
+    const [y, m, d] = a.birth_date.split("-").map(Number);
+    for (const ano of new Set([inicio.getFullYear(), dom.getFullYear()])) {
+      const dia = new Date(ano, m - 1, d);
+      if (dia >= inicio && dia <= dom) quem.push({ a, dia, anos: ano - y });
+    }
+  }
+  if (!quem.length) return "";
+  quem.sort((x, y) => x.dia - y.dia);
+  return `<div class="anos">` + quem.map(({ a, dia, anos }) =>
+    `<span>🎂 <b>${esc(a.full_name)}</b> faz ${anos} ano${anos === 1 ? "" : "s"} · ${DIAS[dia.getDay()].toLowerCase()}, ${dia.getDate()}/${dia.getMonth() + 1}</span>`
+  ).join("") + `</div>`;
+}
 
 // ---- Entrar com Microsoft ou Google ----------------------------------------
 // Identificadores públicos (não são segredos). O servidor confirma cada token

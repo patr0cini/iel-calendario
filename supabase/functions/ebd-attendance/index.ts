@@ -2,8 +2,13 @@
 //   GET   ?date=YYYY-MM-DD               -> classes, children, who was present
 //   GET   ?from=…&to=…                   -> number present per lesson and class
 //   PUT   { date, class_id, present[] }  -> replace that class's attendance
-//   POST  /children { full_name, class_id }          -> add a child
-//   PATCH /children/{id} { full_name?, class_id?, active? } -> edit / move / hide
+//   GET   /children                      -> every child's record (Alunos tab)
+//   POST  /children { full_name, class_id?, birth_date?, guardians?, contacts?,
+//                     notes?, visitor?, date? }        -> add a student or visitor
+//   PATCH /children/{id} { …same fields, active? }      -> edit / move / hide
+//
+// A visitor is created on the lesson they came to (`date`) and marked present
+// there; they are never offered again for attendance.
 //
 // Children are minors: only a PERSONAL sign-in (Microsoft or Google) of an EBD
 // member, or the Presbitério (admin), gets in. Link tokens and the open
@@ -42,6 +47,49 @@ async function lessonService(db: SupabaseClient, date: string): Promise<string> 
   return data.id as string;
 }
 
+const CHILD_FIELDS = "id, full_name, ebd_class_id, birth_date, guardians, contacts, notes, visitor, active";
+
+interface ChildInput {
+  full_name?: string;
+  class_id?: string | null;
+  birth_date?: string | null;
+  guardians?: string | null;
+  contacts?: string | null;
+  notes?: string | null;
+  visitor?: boolean;
+  active?: boolean;
+  date?: string;
+}
+
+function optionalText(v: unknown, max: number): string | null {
+  if (v === null || v === undefined) return null;
+  const t = String(v).trim();
+  if (t.length > max) throw new HttpError(400, "Texto demasiado comprido.");
+  return t || null;
+}
+
+/** The record fields of a child, validated (only those present in `body`). */
+async function childPatch(db: SupabaseClient, body: ChildInput): Promise<Record<string, unknown>> {
+  const patch: Record<string, unknown> = {};
+  if (body.full_name !== undefined) patch.full_name = cleanName(body.full_name);
+  if (body.class_id !== undefined) {
+    if (body.class_id) await activeClass(db, body.class_id);
+    patch.ebd_class_id = body.class_id || null;
+  }
+  if (body.birth_date !== undefined) {
+    if (body.birth_date && (!DATE_RE.test(body.birth_date) || body.birth_date > today())) {
+      throw new HttpError(400, "Data de nascimento inválida.");
+    }
+    patch.birth_date = body.birth_date || null;
+  }
+  if (body.guardians !== undefined) patch.guardians = optionalText(body.guardians, 500);
+  if (body.contacts !== undefined) patch.contacts = optionalText(body.contacts, 800);
+  if (body.notes !== undefined) patch.notes = optionalText(body.notes, 1000);
+  if (body.visitor !== undefined) patch.visitor = Boolean(body.visitor);
+  if (body.active !== undefined) patch.active = Boolean(body.active);
+  return patch;
+}
+
 async function activeClass(db: SupabaseClient, classId: string): Promise<void> {
   const { data } = await db.from("ebd_classes").select("id").eq("id", classId).eq("active", true).maybeSingle();
   if (!data) throw new HttpError(404, "Classe desconhecida.");
@@ -67,36 +115,44 @@ Deno.serve(async (req) => {
 
     // ---- children ------------------------------------------------------------
     if (seg[0] === "children") {
+      if (req.method === "GET" && !seg[1]) {
+        const { data, error } = await db.from("ebd_children").select(CHILD_FIELDS).order("full_name");
+        if (error) throw new HttpError(500, error.message);
+        return jsonResponse(req, 200, data);
+      }
       if (req.method === "POST" && !seg[1]) {
-        const body = await readJson<{ full_name?: string; class_id?: string }>(req);
-        const full_name = cleanName(body.full_name);
-        if (!body.class_id) throw new HttpError(400, "class_id is required");
-        await activeClass(db, body.class_id);
-        const { data, error } = await db
-          .from("ebd_children")
-          .insert({ full_name, ebd_class_id: body.class_id })
-          .select("id, full_name, ebd_class_id, active")
-          .single();
+        const body = await readJson<ChildInput>(req);
+        const patch = await childPatch(db, { ...body, full_name: body.full_name ?? "" });
+        // A visitor exists only for the lesson they came to.
+        let serviceId: string | null = null;
+        if (patch.visitor) {
+          if (!body.date || !patch.ebd_class_id) throw new HttpError(400, "Um visitante precisa da lição e da classe.");
+          if (body.date > today()) throw new HttpError(400, "Só se registam presenças de lições que já aconteceram.");
+          serviceId = await lessonService(db, body.date);
+        }
+        const { data, error } = await db.from("ebd_children").insert(patch).select(CHILD_FIELDS).single();
         if (error) throw new HttpError(400, error.message);
+        if (serviceId) {
+          const { error: e2 } = await db.from("ebd_attendance").insert({
+            service_id: serviceId,
+            ebd_class_id: patch.ebd_class_id,
+            child_id: data.id,
+            recorded_by: identity.personId,
+          });
+          if (e2) throw new HttpError(400, e2.message);
+        }
         await writeAudit(db, identity, { action: "create", entity: "ebd_children", entityId: data.id, after: data, ministryId: ebdId });
         return jsonResponse(req, 201, data);
       }
       if (req.method === "PATCH" && seg[1]) {
-        const body = await readJson<{ full_name?: string; class_id?: string; active?: boolean }>(req);
-        const patch: Record<string, unknown> = {};
-        if (body.full_name !== undefined) patch.full_name = cleanName(body.full_name);
-        if (body.class_id !== undefined) {
-          await activeClass(db, body.class_id);
-          patch.ebd_class_id = body.class_id;
-        }
-        if (body.active !== undefined) patch.active = Boolean(body.active);
+        const patch = await childPatch(db, await readJson<ChildInput>(req));
         const { data: before } = await db.from("ebd_children").select("*").eq("id", seg[1]).maybeSingle();
         if (!before) throw new HttpError(404, "Criança não encontrada.");
         const { data, error } = await db
           .from("ebd_children")
           .update(patch)
           .eq("id", seg[1])
-          .select("id, full_name, ebd_class_id, active")
+          .select(CHILD_FIELDS)
           .single();
         if (error) throw new HttpError(400, error.message);
         await writeAudit(db, identity, { action: "update", entity: "ebd_children", entityId: seg[1], before, after: data, ministryId: ebdId });
@@ -129,16 +185,21 @@ Deno.serve(async (req) => {
       const serviceId = await lessonService(db, date);
       const [classes, children, present] = await Promise.all([
         db.from("ebd_classes").select("id, name").eq("active", true).order("sort_order"),
-        db.from("ebd_children").select("id, full_name, ebd_class_id, active").order("full_name"),
+        db.from("ebd_children").select("id, full_name, ebd_class_id, active, visitor").order("full_name"),
         db.from("ebd_attendance").select("child_id, ebd_class_id, created_at, people(full_name)").eq("service_id", serviceId),
       ]);
       if (classes.error || children.error || present.error) throw new HttpError(500, "lookup failed");
       const presentIds = new Set((present.data ?? []).map((p) => p.child_id as string));
+      // Where each child was marked that day (they may have changed class since).
+      const presentClass = new Map((present.data ?? []).map((p) => [p.child_id as string, p.ebd_class_id as string]));
       return jsonResponse(req, 200, {
         date,
         classes: classes.data,
-        // Hidden children stay listed only where they were marked present.
-        children: (children.data ?? []).filter((c) => c.active || presentIds.has(c.id as string)),
+        // Offered for attendance: active students with a class. Hidden children
+        // and visitors appear only on the lessons where they were present.
+        children: (children.data ?? [])
+          .filter((c) => presentIds.has(c.id as string) || (c.active && !c.visitor && c.ebd_class_id))
+          .map((c) => ({ ...c, ebd_class_id: presentClass.get(c.id as string) ?? c.ebd_class_id })),
         present: [...presentIds],
         recorded_by: Object.fromEntries(
           (present.data ?? []).map((p) => [
